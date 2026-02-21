@@ -1,37 +1,70 @@
 @echo off
-echo === CardGuard Quick Deploy Script ===
+echo.
+echo ========================================
+echo         CardGuard Deployment
+echo ========================================
 echo.
 
 REM Check if git is initialized
 if not exist ".git" (
-    echo Initializing git repository...
+    echo Initializing Git repository...
     git init
-    git add .
-    git commit -m "Initial commit: CardGuard with mobile navigation and cloud database support"
     echo.
-    echo ⚠️  IMPORTANT: Next steps:
-    echo 1. Create a new repository on GitHub: https://github.com/new
-    echo 2. Run: git remote add origin https://github.com/YOUR_USERNAME/cardguard.git
-    echo 3. Run: git push -u origin main
-    echo 4. Go to https://vercel.com and import your repository
-    echo 5. Click 'Deploy' - that's it!
-) else (
-    echo Git repository already exists.
-    echo Adding changes and committing...
-    git add .
-    git commit -m "Add mobile navigation and Vercel Postgres support"
-    echo.
-    echo ✅ Ready to deploy!
-    echo 1. Run: git push
-    echo 2. Go to https://vercel.com and import your repository
-    echo 3. Click 'Deploy'
 )
 
+REM Check if node_modules exists
+if not exist "node_modules" (
+    echo Installing dependencies...
+    npm install
+    echo.
+)
+
+REM Add all changes
+echo Adding changes to Git...
+git add .
+
+REM Check if there are changes to commit
+git diff --cached --quiet
+if %errorlevel% equ 0 (
+    echo No changes to commit.
+    echo.
+    echo Your app is already up to date!
+    echo.
+    echo Open your app at: https://cardguard-8q41.vercel.app/
+    echo.
+    pause
+    exit /b 0
+)
+
+REM Get commit message from user or use default
+set /p commit_msg="Enter commit message (or press Enter for default): "
+if "%commit_msg%"=="" set commit_msg=Update CardGuard app
+
+REM Commit changes
+echo Committing changes...
+git commit -m "%commit_msg%"
+
+REM Push to GitHub
 echo.
-echo 📱 After deployment, your app will have:
-echo    - Mobile-friendly navigation
-echo    - Free cloud database (Vercel Postgres)
-echo    - OCR card scanning
-echo    - PWA support (install as app)
+echo Pushing to GitHub...
+git push
+
+echo.
+echo ========================================
+echo           Deployment Complete!
+echo ========================================
+echo.
+echo ✅ Your changes have been deployed!
+echo.
+echo 🌐 Your app will be live in 1-2 minutes at:
+echo    https://cardguard-8q41.vercel.app/
+echo.
+echo 📱 You can also open it on your phone!
+echo.
+echo 📝 What was deployed:
+git log --oneline -1
+echo.
+echo 🔄 If you don't see changes, wait 2 minutes
+echo    then refresh the page.
 echo.
 pause
