@@ -8,13 +8,20 @@ function requireClient() {
   return supabase
 }
 
+async function getCurrentUserId(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user?.id) throw new Error('User not authenticated')
+  return session.user.id
+}
+
 export async function resetDatabase(): Promise<void> {
   return
 }
 
 export async function getSettings(): Promise<AppSettings> {
   const sb = requireClient()
-  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled').eq('key', 'app').maybeSingle()
+  const userId = await getCurrentUserId()
+  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled').eq('user_id', userId).maybeSingle()
   if (error) throw error
   return (
     data ?? {
@@ -26,15 +33,17 @@ export async function getSettings(): Promise<AppSettings> {
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
   const sb = requireClient()
+  const userId = await getCurrentUserId()
   const { error } = await sb
     .from('settings')
-    .upsert({ key: 'app', reminderdays: settings.reminderDays, notificationsenabled: settings.notificationsEnabled })
+    .upsert({ key: 'app', reminderdays: settings.reminderDays, notificationsenabled: settings.notificationsEnabled, user_id: userId })
   if (error) throw error
 }
 
 export async function listCards(): Promise<CardRecord[]> {
   const sb = requireClient()
-  const { data, error } = await sb.from('cards').select('*').order('expirydate', { ascending: true })
+  const userId = await getCurrentUserId()
+  const { data, error } = await sb.from('cards').select('*').eq('user_id', userId).order('expirydate', { ascending: true })
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     ...row,
@@ -49,7 +58,8 @@ export async function listCards(): Promise<CardRecord[]> {
 
 export async function getCard(id: string): Promise<CardWithImage | undefined> {
   const sb = requireClient()
-  const { data, error } = await sb.from('cards').select('*').eq('id', id).maybeSingle()
+  const userId = await getCurrentUserId()
+  const { data, error } = await sb.from('cards').select('*').eq('id', id).eq('user_id', userId).maybeSingle()
   if (error) throw error
   if (!data) return undefined
 
@@ -70,6 +80,7 @@ export async function getCard(id: string): Promise<CardWithImage | undefined> {
 
 export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob }): Promise<void> {
   const sb = requireClient()
+  const userId = await getCurrentUserId()
   const { error } = await sb.from('cards').upsert({
     id: input.card.id,
     kind: input.card.kind,
@@ -81,7 +92,8 @@ export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob }):
     renewalproviderid: input.card.renewalProviderId,
     notes: input.card.notes,
     createdat: input.card.createdAt,
-    updatedat: input.card.updatedAt
+    updatedat: input.card.updatedAt,
+    user_id: userId
   })
   if (error) throw error
 
@@ -96,14 +108,16 @@ export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob }):
 
 export async function deleteCard(id: string): Promise<void> {
   const sb = requireClient()
-  const { error } = await sb.from('cards').delete().eq('id', id)
+  const userId = await getCurrentUserId()
+  const { error } = await sb.from('cards').delete().eq('id', id).eq('user_id', userId)
   if (error) throw error
   await sb.storage.from(IMAGE_BUCKET).remove([id])
 }
 
 export async function listProfiles(): Promise<Profile[]> {
   const sb = requireClient()
-  const { data, error } = await sb.from('profiles').select('*').order('name', { ascending: true })
+  const userId = await getCurrentUserId()
+  const { data, error } = await sb.from('profiles').select('*').eq('user_id', userId).order('name', { ascending: true })
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     ...row,
@@ -113,10 +127,12 @@ export async function listProfiles(): Promise<Profile[]> {
 
 export async function createProfile(name: string): Promise<Profile> {
   const sb = requireClient()
+  const userId = await getCurrentUserId()
   const profile = {
     id: crypto.randomUUID(),
     name: name.trim(),
-    createdat: Date.now()
+    createdat: Date.now(),
+    user_id: userId
   }
   const { error } = await sb.from('profiles').insert(profile)
   if (error) throw error
@@ -129,13 +145,15 @@ export async function createProfile(name: string): Promise<Profile> {
 
 export async function deleteProfile(id: string): Promise<void> {
   const sb = requireClient()
-  const { error } = await sb.from('profiles').delete().eq('id', id)
+  const userId = await getCurrentUserId()
+  const { error } = await sb.from('profiles').delete().eq('id', id).eq('user_id', userId)
   if (error) throw error
 }
 
 export async function listRenewalProviders(): Promise<RenewalProvider[]> {
   const sb = requireClient()
-  const { data, error } = await sb.from('renewalproviders').select('*').order('name', { ascending: true })
+  const userId = await getCurrentUserId()
+  const { data, error } = await sb.from('renewalproviders').select('*').eq('user_id', userId).order('name', { ascending: true })
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     ...row,
@@ -145,11 +163,13 @@ export async function listRenewalProviders(): Promise<RenewalProvider[]> {
 
 export async function createRenewalProvider(input: { name: string; url: string }): Promise<RenewalProvider> {
   const sb = requireClient()
+  const userId = await getCurrentUserId()
   const provider = {
     id: crypto.randomUUID(),
     name: input.name.trim(),
     url: input.url.trim(),
-    createdat: Date.now()
+    createdat: Date.now(),
+    user_id: userId
   }
   const { error } = await sb.from('renewalproviders').insert(provider)
   if (error) throw error
@@ -163,7 +183,8 @@ export async function createRenewalProvider(input: { name: string; url: string }
 
 export async function deleteRenewalProvider(id: string): Promise<void> {
   const sb = requireClient()
-  const { error } = await sb.from('renewalproviders').delete().eq('id', id)
+  const userId = await getCurrentUserId()
+  const { error } = await sb.from('renewalproviders').delete().eq('id', id).eq('user_id', userId)
   if (error) throw error
 }
 

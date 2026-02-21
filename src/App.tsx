@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppSettings, CardKind, CardRecord, Profile, RenewalProvider } from './lib/types'
 import { daysUntil, isExpired } from './lib/expiry'
 import { scanCardImage } from './lib/ocr'
+import { Auth } from './components/Auth'
+import type { User } from '@supabase/supabase-js'
 import {
   createCardKind,
   createProfile,
@@ -46,6 +48,7 @@ function formatDaysLabel(d: number): string {
 }
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<CardRecord[]>([])
   const [filter, setFilter] = useState<FilterMode>('All')
   const [settings, setSettings] = useState<AppSettings | null>(null)
@@ -490,8 +493,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-6">
+    <Auth onAuthChange={setUser}>
+      {user && (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+          <div className="mx-auto max-w-6xl px-4 py-6">
         {dbError ? (
           <section className="mb-4 rounded-2xl bg-red-500/10 p-4 ring-1 ring-red-500/30">
             <div className="text-sm font-semibold text-red-200">
@@ -1145,6 +1150,8 @@ export default function App() {
           </div>
         ) : null}
       </div>
-    </div>
+        </div>
+      )}
+    </Auth>
   )
 }
