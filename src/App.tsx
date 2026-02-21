@@ -20,7 +20,7 @@ import {
   resetDatabase,
   saveSettings,
   upsertCard
-} from './lib/db'
+} from './lib/db-unified'
 
 type FilterMode = 'All' | 'Expiring' | 'Expired'
 
