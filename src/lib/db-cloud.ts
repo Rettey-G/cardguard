@@ -14,7 +14,7 @@ export async function resetDatabase(): Promise<void> {
 
 export async function getSettings(): Promise<AppSettings> {
   const sb = requireClient()
-  const { data, error } = await sb.from('settings').select('reminderDays,notificationsEnabled').eq('key', 'app').maybeSingle()
+  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled').eq('key', 'app').maybeSingle()
   if (error) throw error
   return (
     data ?? {
@@ -28,15 +28,23 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   const sb = requireClient()
   const { error } = await sb
     .from('settings')
-    .upsert({ key: 'app', reminderDays: settings.reminderDays, notificationsEnabled: settings.notificationsEnabled })
+    .upsert({ key: 'app', reminderdays: settings.reminderDays, notificationsenabled: settings.notificationsEnabled })
   if (error) throw error
 }
 
 export async function listCards(): Promise<CardRecord[]> {
   const sb = requireClient()
-  const { data, error } = await sb.from('cards').select('*').order('expiryDate', { ascending: true })
+  const { data, error } = await sb.from('cards').select('*').order('expirydate', { ascending: true })
   if (error) throw error
-  return (data ?? []) as CardRecord[]
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    createdAt: row.createdat,
+    updatedAt: row.updatedat,
+    expiryDate: row.expirydate,
+    renewUrl: row.renewurl,
+    profileId: row.profileid,
+    renewalProviderId: row.renewalproviderid
+  })) as CardRecord[]
 }
 
 export async function getCard(id: string): Promise<CardWithImage | undefined> {
@@ -48,12 +56,33 @@ export async function getCard(id: string): Promise<CardWithImage | undefined> {
   const dl = await sb.storage.from(IMAGE_BUCKET).download(id)
   const imageBlob = dl.error ? undefined : dl.data
 
-  return { ...(data as CardRecord), imageBlob }
+  return {
+    ...(data as any),
+    createdAt: (data as any).createdat,
+    updatedAt: (data as any).updatedat,
+    expiryDate: (data as any).expirydate,
+    renewUrl: (data as any).renewurl,
+    profileId: (data as any).profileid,
+    renewalProviderId: (data as any).renewalproviderid,
+    imageBlob
+  }
 }
 
 export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob }): Promise<void> {
   const sb = requireClient()
-  const { error } = await sb.from('cards').upsert(input.card)
+  const { error } = await sb.from('cards').upsert({
+    id: input.card.id,
+    kind: input.card.kind,
+    title: input.card.title,
+    issuer: input.card.issuer,
+    expirydate: input.card.expiryDate,
+    renewurl: input.card.renewUrl,
+    profileid: input.card.profileId,
+    renewalproviderid: input.card.renewalProviderId,
+    notes: input.card.notes,
+    createdat: input.card.createdAt,
+    updatedat: input.card.updatedAt
+  })
   if (error) throw error
 
   if (input.imageBlob) {
@@ -76,15 +105,26 @@ export async function listProfiles(): Promise<Profile[]> {
   const sb = requireClient()
   const { data, error } = await sb.from('profiles').select('*').order('name', { ascending: true })
   if (error) throw error
-  return (data ?? []) as Profile[]
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    createdAt: row.createdat
+  })) as Profile[]
 }
 
 export async function createProfile(name: string): Promise<Profile> {
   const sb = requireClient()
-  const profile: Profile = { id: crypto.randomUUID(), name: name.trim(), createdAt: Date.now() }
+  const profile = {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    createdat: Date.now()
+  }
   const { error } = await sb.from('profiles').insert(profile)
   if (error) throw error
-  return profile
+  return {
+    id: profile.id,
+    name: profile.name,
+    createdAt: profile.createdat
+  }
 }
 
 export async function deleteProfile(id: string): Promise<void> {
@@ -95,47 +135,55 @@ export async function deleteProfile(id: string): Promise<void> {
 
 export async function listRenewalProviders(): Promise<RenewalProvider[]> {
   const sb = requireClient()
-  const { data, error } = await sb.from('renewalProviders').select('*').order('name', { ascending: true })
+  const { data, error } = await sb.from('renewalproviders').select('*').order('name', { ascending: true })
   if (error) throw error
-  return (data ?? []) as RenewalProvider[]
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    createdAt: row.createdat
+  })) as RenewalProvider[]
 }
 
 export async function createRenewalProvider(input: { name: string; url: string }): Promise<RenewalProvider> {
   const sb = requireClient()
-  const provider: RenewalProvider = {
+  const provider = {
     id: crypto.randomUUID(),
     name: input.name.trim(),
     url: input.url.trim(),
-    createdAt: Date.now()
+    createdat: Date.now()
   }
-  const { error } = await sb.from('renewalProviders').insert(provider)
+  const { error } = await sb.from('renewalproviders').insert(provider)
   if (error) throw error
-  return provider
+  return {
+    id: provider.id,
+    name: provider.name,
+    url: provider.url,
+    createdAt: provider.createdat
+  }
 }
 
 export async function deleteRenewalProvider(id: string): Promise<void> {
   const sb = requireClient()
-  const { error } = await sb.from('renewalProviders').delete().eq('id', id)
+  const { error } = await sb.from('renewalproviders').delete().eq('id', id)
   if (error) throw error
 }
 
 export async function listCardKinds(): Promise<string[]> {
   const sb = requireClient()
-  const { data, error } = await sb.from('cardKinds').select('name').order('name', { ascending: true })
+  const { data, error } = await sb.from('cardkinds').select('name').order('name', { ascending: true })
   if (error) throw error
-  return (data ?? []).map((x) => x.name as string)
+  return (data ?? []).map((x: any) => x.name as string)
 }
 
 export async function createCardKind(name: string): Promise<void> {
   const sb = requireClient()
   const trimmed = name.trim()
   if (!trimmed) return
-  const { error } = await sb.from('cardKinds').upsert({ name: trimmed, createdAt: Date.now() })
+  const { error } = await sb.from('cardkinds').upsert({ name: trimmed, createdat: Date.now() })
   if (error) throw error
 }
 
 export async function deleteCardKind(name: string): Promise<void> {
   const sb = requireClient()
-  const { error } = await sb.from('cardKinds').delete().eq('name', name)
+  const { error } = await sb.from('cardkinds').delete().eq('name', name)
   if (error) throw error
 }
