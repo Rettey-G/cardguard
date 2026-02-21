@@ -48,6 +48,22 @@ function formatDaysLabel(d: number): string {
   return `${d} days left`
 }
 
+function pseudoCardNumber(seed: string | null | undefined): string {
+  const s = seed ?? ''
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  const digits = Array.from({ length: 16 }, (_, i) => {
+    h ^= (h >>> 13)
+    h = Math.imul(h, 2246822507)
+    const d = Math.abs(h + i) % 10
+    return String(d)
+  }).join('')
+  return `${digits.slice(0, 4)} ${digits.slice(4, 8)} ${digits.slice(8, 12)} ${digits.slice(12, 16)}`
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<CardRecord[]>([])
@@ -164,7 +180,12 @@ export default function App() {
     const expiredCount = by.filter((x) => x.expired).length
 
     return { filtered, expiringSoonCount, expiredCount }
-  }, [cards, filter, settings?.reminderDays])
+  }, [cards, filter, settings])
+
+  const viewingCard = useMemo(() => {
+    if (!viewingId) return null
+    return cards.find((x) => x.id === viewingId) ?? null
+  }, [cards, viewingId])
 
   useEffect(() => {
     if (!settings?.notificationsEnabled) return
@@ -1058,31 +1079,58 @@ export default function App() {
               <div className="min-h-0 flex-1 overflow-y-auto p-5">
                 <div
                   ref={ecardRef}
-                  className="mx-auto w-full max-w-md overflow-hidden rounded-3xl ring-1 ring-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900"
+                  className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl ring-1 ring-slate-800"
                 >
-                  <div className="p-5">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/25 via-slate-950 to-emerald-500/20" />
+                  <div className="absolute -top-24 -right-24 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+                  <div className="absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-emerald-400/10 blur-2xl" />
+
+                  <div className="relative p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-xs text-slate-400">Card</div>
+                        <div className="text-xs text-slate-200/70">{viewingCard?.kind ?? 'Card'}</div>
                         <div className="truncate text-lg font-semibold text-slate-50">{viewingTitle}</div>
-                        <div className="mt-1 text-xs text-slate-300">Type: {cards.find((x) => x.id === viewingId)?.kind ?? '—'}</div>
                       </div>
-                      <div className="rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-500/20">
+                      <div className="text-right">
+                        <div className="text-xs text-slate-200/70">Issuer</div>
+                        <div className="max-w-[11rem] truncate text-sm font-semibold text-slate-100">
+                          {viewingCard?.issuer || '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-14 rounded-xl bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 ring-1 ring-black/20" />
+                        <svg className="h-8 w-8 text-slate-100/90" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M5 9c4-4 10-4 14 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <path d="M7.5 11.5c2.6-2.6 6.4-2.6 9 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <path d="M10 14c1.1-1.1 2.9-1.1 4 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <path d="M12 16.5h0" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div className="rounded-2xl bg-slate-950/30 px-3 py-2 text-xs text-slate-200 ring-1 ring-slate-800">
                         CardGuard
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="mt-5 font-mono text-lg tracking-widest text-slate-50">
+                      {pseudoCardNumber(viewingId)}
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
                       <div className="rounded-2xl bg-slate-950/40 p-3 ring-1 ring-slate-800">
-                        <div className="text-[11px] text-slate-400">Expiry</div>
-                        <div className="mt-1 text-sm font-semibold text-slate-100">
-                          {cards.find((x) => x.id === viewingId)?.expiryDate ?? '—'}
+                        <div className="text-[11px] text-slate-200/70">Cardholder</div>
+                        <div className="mt-1 truncate text-sm font-semibold text-slate-100">
+                          {(viewingCard?.profileId
+                            ? profiles.find((p) => p.id === viewingCard.profileId)?.name
+                            : null) || 'Personal'}
                         </div>
                       </div>
                       <div className="rounded-2xl bg-slate-950/40 p-3 ring-1 ring-slate-800">
-                        <div className="text-[11px] text-slate-400">Issuer</div>
-                        <div className="mt-1 truncate text-sm font-semibold text-slate-100">
-                          {cards.find((x) => x.id === viewingId)?.issuer || '—'}
+                        <div className="text-[11px] text-slate-200/70">Expiry</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-100">
+                          {viewingCard?.expiryDate ?? '—'}
                         </div>
                       </div>
                     </div>
