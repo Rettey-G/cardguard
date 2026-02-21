@@ -807,8 +807,8 @@ export default function App() {
 
         {formOpen ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
-            <div className="w-full max-w-xl rounded-2xl bg-slate-950 p-5 ring-1 ring-slate-800">
-              <div className="flex items-start justify-between gap-4">
+            <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-slate-950 ring-1 ring-slate-800 max-h-[90dvh]">
+              <div className="flex items-start justify-between gap-4 p-5">
                 <div>
                   <div className="text-lg font-semibold">
                     {editingId ? 'Edit card' : 'Add card'}
@@ -825,8 +825,9 @@ export default function App() {
                 </button>
               </div>
 
-              <form onSubmit={onSave} className="mt-4 grid gap-3">
-                <div className="grid gap-3 sm:grid-cols-2">
+              <form onSubmit={onSave} className="flex min-h-0 flex-1 flex-col">
+                <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto px-5 pb-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1">
                     <span className="text-xs text-slate-300">Type</span>
                     <select
@@ -949,8 +950,9 @@ export default function App() {
                     className="rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </label>
+                </div>
 
-                <div className="mt-2 flex items-center justify-end gap-2">
+                <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-5 py-4 backdrop-blur">
                   <button
                     type="button"
                     onClick={() => setFormOpen(false)}
