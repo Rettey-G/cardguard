@@ -4,6 +4,7 @@ import { daysUntil, isExpired } from './lib/expiry'
 import { scanCardImage } from './lib/ocr'
 import { Auth } from './components/Auth'
 import type { User } from '@supabase/supabase-js'
+import html2canvas from 'html2canvas'
 import {
   createCardKind,
   createProfile,
@@ -70,6 +71,8 @@ export default function App() {
   const [viewingTitle, setViewingTitle] = useState<string>('')
   const [viewingUrl, setViewingUrl] = useState<string | null>(null)
   const [viewingMissing, setViewingMissing] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
+  const ecardRef = useRef<HTMLDivElement | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -249,6 +252,69 @@ export default function App() {
     if (viewingUrl) {
       URL.revokeObjectURL(viewingUrl)
       setViewingUrl(null)
+    }
+  }
+
+  async function renderEcardBlob(): Promise<Blob> {
+    const el = ecardRef.current
+    if (!el) throw new Error('Preview not ready')
+
+    const canvas = await html2canvas(el, {
+      backgroundColor: null,
+      scale: Math.min(2, window.devicePixelRatio || 1)
+    })
+
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b: Blob | null) => resolve(b), 'image/png')
+    )
+    if (!blob) throw new Error('Failed to render image')
+    return blob
+  }
+
+  async function downloadEcard() {
+    try {
+      setShareBusy(true)
+      const blob = await renderEcardBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${(viewingTitle || 'ecard').replace(/[^a-z0-9\-\s_]/gi, '').trim() || 'ecard'}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  async function shareEcard() {
+    try {
+      setShareBusy(true)
+      const blob = await renderEcardBlob()
+      const file = new File([blob], 'ecard.png', { type: 'image/png' })
+
+      const anyNav: any = navigator
+      const canShareFiles = typeof anyNav.canShare === 'function' && anyNav.canShare({ files: [file] })
+
+      if (anyNav.share && canShareFiles) {
+        await anyNav.share({
+          title: viewingTitle || 'Card',
+          text: 'My e-card',
+          files: [file]
+        })
+        return
+      }
+
+      await downloadEcard()
+      alert('Sharing is not supported on this browser. The card was downloaded instead.')
+    } catch (e) {
+      const msg = (e as any)?.name === 'AbortError' ? null : (e as Error).message
+      if (msg) alert(msg)
+    } finally {
+      setShareBusy(false)
     }
   }
 
@@ -975,11 +1041,11 @@ export default function App() {
 
         {viewingId ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
-            <div className="w-full max-w-xl rounded-2xl bg-slate-950 p-5 ring-1 ring-slate-800">
-              <div className="flex items-start justify-between gap-4">
+            <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-slate-950 ring-1 ring-slate-800 max-h-[90dvh]">
+              <div className="flex items-start justify-between gap-4 p-5">
                 <div>
                   <div className="text-lg font-semibold">{viewingTitle}</div>
-                  <div className="text-xs text-slate-400">Saved locally on this device</div>
+                  <div className="text-xs text-slate-400">Wallet preview</div>
                 </div>
                 <button
                   onClick={closeView}
@@ -989,22 +1055,76 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="mt-4">
-                {viewingMissing ? (
-                  <div className="rounded-xl bg-slate-900/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
-                    No image saved for this card.
+              <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                <div
+                  ref={ecardRef}
+                  className="mx-auto w-full max-w-md overflow-hidden rounded-3xl ring-1 ring-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900"
+                >
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xs text-slate-400">Card</div>
+                        <div className="truncate text-lg font-semibold text-slate-50">{viewingTitle}</div>
+                        <div className="mt-1 text-xs text-slate-300">Type: {cards.find((x) => x.id === viewingId)?.kind ?? '—'}</div>
+                      </div>
+                      <div className="rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-500/20">
+                        CardGuard
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl bg-slate-950/40 p-3 ring-1 ring-slate-800">
+                        <div className="text-[11px] text-slate-400">Expiry</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-100">
+                          {cards.find((x) => x.id === viewingId)?.expiryDate ?? '—'}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-950/40 p-3 ring-1 ring-slate-800">
+                        <div className="text-[11px] text-slate-400">Issuer</div>
+                        <div className="mt-1 truncate text-sm font-semibold text-slate-100">
+                          {cards.find((x) => x.id === viewingId)?.issuer || '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      {viewingMissing ? (
+                        <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
+                          No image saved for this card.
+                        </div>
+                      ) : viewingUrl ? (
+                        <img
+                          src={viewingUrl}
+                          alt={viewingTitle}
+                          className="w-full rounded-2xl ring-1 ring-slate-800"
+                        />
+                      ) : (
+                        <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
+                          Loading...
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : viewingUrl ? (
-                  <img
-                    src={viewingUrl}
-                    alt={viewingTitle}
-                    className="w-full rounded-xl ring-1 ring-slate-800"
-                  />
-                ) : (
-                  <div className="rounded-xl bg-slate-900/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
-                    Loading...
-                  </div>
-                )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-5 py-4 backdrop-blur">
+                <button
+                  type="button"
+                  disabled={shareBusy}
+                  onClick={downloadEcard}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  disabled={shareBusy}
+                  onClick={shareEcard}
+                  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 active:bg-emerald-600 disabled:opacity-60"
+                >
+                  Share
+                </button>
               </div>
             </div>
           </div>
