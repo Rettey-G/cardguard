@@ -5,6 +5,7 @@ import { scanCardImage } from './lib/ocr'
 import { Auth } from './components/Auth'
 import type { User } from '@supabase/supabase-js'
 import html2canvas from 'html2canvas'
+import { Analytics } from '@vercel/analytics/react'
 import {
   createCardKind,
   createProfile,
@@ -1324,5 +1325,6 @@ export default function App() {
         ) : null}
       </div>
     </div>
+    <Analytics />
   )
 }
