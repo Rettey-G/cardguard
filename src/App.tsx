@@ -1324,6 +1324,7 @@ export default function App() {
             </div>
           </div>
         ) : null}
+        </div>
       </div>
       <Analytics />
     </>
