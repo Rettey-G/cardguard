@@ -585,9 +585,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      <Auth onAuthChange={setUser} />
-      <div className="mx-auto max-w-6xl px-4 py-6">
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+        <Auth onAuthChange={setUser} />
+        <div className="mx-auto max-w-6xl px-4 py-6">
         {dbError ? (
           <section className="mb-4 rounded-2xl bg-red-500/10 p-4 ring-1 ring-red-500/30">
             <div className="text-sm font-semibold text-red-200">
@@ -1324,7 +1325,7 @@ export default function App() {
           </div>
         ) : null}
       </div>
-    </div>
-    <Analytics />
+      <Analytics />
+    </>
   )
 }
