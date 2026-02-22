@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppSettings, CardKind, CardRecord, Profile, RenewalProvider } from './lib/types'
+import type { AppSettings, CardAttachment, CardKind, CardRecord, Profile, RenewalProvider } from './lib/types'
 import { daysUntil, isExpired } from './lib/expiry'
 import { scanCardImage } from './lib/ocr'
 import { Auth } from './components/Auth'
@@ -88,6 +88,8 @@ export default function App() {
   const [viewingTitle, setViewingTitle] = useState<string>('')
   const [viewingUrl, setViewingUrl] = useState<string | null>(null)
   const [viewingMissing, setViewingMissing] = useState(false)
+  const [viewingAttachments, setViewingAttachments] = useState<CardAttachment[]>([])
+  const [viewingAttachmentIndex, setViewingAttachmentIndex] = useState(0)
   const [shareBusy, setShareBusy] = useState(false)
   const ecardRef = useRef<HTMLDivElement | null>(null)
 
@@ -250,6 +252,8 @@ export default function App() {
     setViewingTitle(c?.title ?? 'Card image')
     setViewingId(cardId)
     setViewingMissing(false)
+    setViewingAttachments([])
+    setViewingAttachmentIndex(0)
 
     if (viewingUrl) {
       URL.revokeObjectURL(viewingUrl)
@@ -257,13 +261,29 @@ export default function App() {
     }
 
     const full = await getCard(cardId)
-    const blob = full?.imageBlob
-    if (!blob) {
+    const attachments: CardAttachment[] =
+      full?.attachments && full.attachments.length
+        ? full.attachments
+        : full?.imageBlob
+          ? [
+              {
+                id: 'image',
+                name: 'image',
+                contentType: full.imageBlob.type || 'application/octet-stream',
+                blob: full.imageBlob
+              }
+            ]
+          : []
+
+    setViewingAttachments(attachments)
+
+    const first = attachments[0]
+    if (!first?.blob) {
       setViewingMissing(true)
       return
     }
 
-    const url = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(first.blob)
     setViewingUrl(url)
   }
 
@@ -271,10 +291,36 @@ export default function App() {
     setViewingId(null)
     setViewingTitle('')
     setViewingMissing(false)
+    setViewingAttachments([])
+    setViewingAttachmentIndex(0)
     if (viewingUrl) {
       URL.revokeObjectURL(viewingUrl)
       setViewingUrl(null)
     }
+  }
+
+  function onSelectViewingAttachment(index: number) {
+    const next = viewingAttachments[index]
+    if (!next) return
+    setViewingAttachmentIndex(index)
+    if (viewingUrl) {
+      URL.revokeObjectURL(viewingUrl)
+      setViewingUrl(null)
+    }
+    setViewingUrl(URL.createObjectURL(next.blob))
+  }
+
+  async function downloadViewingAttachment() {
+    const a = viewingAttachments[viewingAttachmentIndex]
+    if (!a) return
+    const url = URL.createObjectURL(a.blob)
+    const el = document.createElement('a')
+    el.href = url
+    el.download = a.name || 'attachment'
+    document.body.appendChild(el)
+    el.click()
+    el.remove()
+    URL.revokeObjectURL(url)
   }
 
   async function renderEcardBlob(): Promise<Blob> {
@@ -358,7 +404,8 @@ export default function App() {
   }
 
   async function onScanImage() {
-    const file = fileRef.current?.files?.[0]
+    const files = Array.from(fileRef.current?.files ?? [])
+    const file = files.find((f) => f.type.startsWith('image/'))
     if (!file) {
       setScanMsg('Please choose an image first.')
       return
@@ -444,10 +491,18 @@ export default function App() {
         updatedAt: now
       }
 
-      const file = fileRef.current?.files?.[0]
-      const imageBlob = file ? file.slice(0, file.size, file.type) : undefined
+      const files = Array.from(fileRef.current?.files ?? [])
+      const attachments: CardAttachment[] = files.map((f, idx) => ({
+        id: `${String(idx + 1).padStart(2, '0')}-${f.name}`,
+        name: f.name,
+        contentType: f.type || 'application/octet-stream',
+        blob: f.slice(0, f.size, f.type)
+      }))
 
-      await upsertCard({ card, imageBlob })
+      const firstImage = files.find((f) => f.type.startsWith('image/'))
+      const imageBlob = firstImage ? firstImage.slice(0, firstImage.size, firstImage.type) : undefined
+
+      await upsertCard({ card, imageBlob, attachments: attachments.length ? attachments : undefined })
       await refresh()
       setFormOpen(false)
     } finally {
@@ -1009,11 +1064,12 @@ export default function App() {
                 </label>
 
                 <label className="grid gap-1">
-                  <span className="text-xs text-slate-300">Card image (optional)</span>
+                  <span className="text-xs text-slate-300">Card files (optional)</span>
                   <input
                     ref={fileRef}
                     type="file"
-                    accept="image/*"
+                    multiple
+                    accept="image/*,application/pdf"
                     className="block w-full text-sm text-slate-200 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-white"
                   />
                 </label>
@@ -1143,11 +1199,49 @@ export default function App() {
                           No image saved for this card.
                         </div>
                       ) : viewingUrl ? (
-                        <img
-                          src={viewingUrl}
-                          alt={viewingTitle}
-                          className="w-full rounded-2xl ring-1 ring-slate-800"
-                        />
+                        <div className="grid gap-3">
+                          {viewingAttachments.length > 1 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {viewingAttachments.map((a, idx) => (
+                                <button
+                                  key={`${a.id}-${idx}`}
+                                  type="button"
+                                  onClick={() => onSelectViewingAttachment(idx)}
+                                  className={
+                                    idx === viewingAttachmentIndex
+                                      ? 'rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-200 ring-1 ring-emerald-500/30'
+                                      : 'rounded-full bg-slate-950/30 px-3 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900'
+                                  }
+                                  title={a.name}
+                                >
+                                  {idx === 0 ? 'Front' : idx === 1 ? 'Back' : `File ${idx + 1}`}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {viewingAttachments[viewingAttachmentIndex]?.contentType === 'application/pdf' ? (
+                            <object
+                              data={viewingUrl}
+                              type="application/pdf"
+                              className="h-[60vh] w-full rounded-2xl ring-1 ring-slate-800"
+                            >
+                              <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
+                                PDF preview not supported in this browser. Use Download.
+                              </div>
+                            </object>
+                          ) : viewingAttachments[viewingAttachmentIndex]?.contentType?.startsWith('image/') ? (
+                            <img
+                              src={viewingUrl}
+                              alt={viewingTitle}
+                              className="w-full rounded-2xl ring-1 ring-slate-800"
+                            />
+                          ) : (
+                            <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
+                              Preview not available. Use Download.
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
                           Loading...
@@ -1159,13 +1253,23 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-5 py-4 backdrop-blur">
+                {viewingAttachments.length ? (
+                  <button
+                    type="button"
+                    disabled={shareBusy}
+                    onClick={downloadViewingAttachment}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    Download file
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   disabled={shareBusy}
                   onClick={downloadEcard}
                   className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
                 >
-                  Download
+                  Download card
                 </button>
                 <button
                   type="button"

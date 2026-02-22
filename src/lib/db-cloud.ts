@@ -1,4 +1,4 @@
-import type { AppSettings, CardRecord, CardWithImage, Profile, RenewalProvider } from './types'
+import type { AppSettings, CardAttachment, CardRecord, CardWithImage, Profile, RenewalProvider } from './types'
 import { supabase } from './supabase'
 
 const IMAGE_BUCKET = 'card-images'
@@ -9,7 +9,8 @@ function requireClient() {
 }
 
 async function getCurrentUserId(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession()
+  const sb = requireClient()
+  const { data: { session } } = await sb.auth.getSession()
   if (!session?.user?.id) throw new Error('User not authenticated')
   return session.user.id
 }
@@ -23,12 +24,16 @@ export async function getSettings(): Promise<AppSettings> {
   const userId = await getCurrentUserId()
   const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled').eq('user_id', userId).maybeSingle()
   if (error) throw error
-  return (
-    data ?? {
+  if (!data) {
+    return {
       reminderDays: 30,
       notificationsEnabled: false
     }
-  )
+  }
+  return {
+    reminderDays: (data as any).reminderdays,
+    notificationsEnabled: (data as any).notificationsenabled
+  }
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
@@ -63,8 +68,28 @@ export async function getCard(id: string): Promise<CardWithImage | undefined> {
   if (error) throw error
   if (!data) return undefined
 
-  const dl = await sb.storage.from(IMAGE_BUCKET).download(id)
-  const imageBlob = dl.error ? undefined : dl.data
+  const attachments: CardAttachment[] = []
+
+  const listRes = await sb.storage.from(IMAGE_BUCKET).list(id, { limit: 100, offset: 0 })
+  if (!listRes.error) {
+    for (const obj of listRes.data ?? []) {
+      if (!obj.name) continue
+      const path = `${id}/${obj.name}`
+      const dl = await sb.storage.from(IMAGE_BUCKET).download(path)
+      if (dl.error || !dl.data) continue
+      const ct = dl.data.type || 'application/octet-stream'
+      attachments.push({
+        id: obj.name,
+        name: obj.name,
+        contentType: ct,
+        blob: dl.data
+      })
+    }
+  }
+
+  const legacyDl = await sb.storage.from(IMAGE_BUCKET).download(id)
+  const legacyImageBlob = legacyDl.error ? undefined : legacyDl.data
+  const imageBlob = legacyImageBlob ?? attachments.find((a) => a.contentType.startsWith('image/'))?.blob
 
   return {
     ...(data as any),
@@ -74,11 +99,12 @@ export async function getCard(id: string): Promise<CardWithImage | undefined> {
     renewUrl: (data as any).renewurl,
     profileId: (data as any).profileid,
     renewalProviderId: (data as any).renewalproviderid,
-    imageBlob
+    imageBlob,
+    attachments: attachments.length ? attachments : undefined
   }
 }
 
-export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob }): Promise<void> {
+export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob; attachments?: CardAttachment[] }): Promise<void> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
   const { error } = await sb.from('cards').upsert({
@@ -104,6 +130,26 @@ export async function upsertCard(input: { card: CardRecord; imageBlob?: Blob }):
     })
     if (up.error) throw up.error
   }
+
+  if (input.attachments) {
+    const listRes = await sb.storage.from(IMAGE_BUCKET).list(input.card.id, { limit: 100, offset: 0 })
+    if (!listRes.error) {
+      const paths = (listRes.data ?? []).map((o) => `${input.card.id}/${o.name}`)
+      if (paths.length) {
+        const rm = await sb.storage.from(IMAGE_BUCKET).remove(paths)
+        if (rm.error) throw rm.error
+      }
+    }
+
+    for (const a of input.attachments) {
+      const path = `${input.card.id}/${a.id}`
+      const up = await sb.storage.from(IMAGE_BUCKET).upload(path, a.blob, {
+        upsert: true,
+        contentType: a.contentType || a.blob.type || 'application/octet-stream'
+      })
+      if (up.error) throw up.error
+    }
+  }
 }
 
 export async function deleteCard(id: string): Promise<void> {
@@ -111,7 +157,15 @@ export async function deleteCard(id: string): Promise<void> {
   const userId = await getCurrentUserId()
   const { error } = await sb.from('cards').delete().eq('id', id).eq('user_id', userId)
   if (error) throw error
+
   await sb.storage.from(IMAGE_BUCKET).remove([id])
+  const listRes = await sb.storage.from(IMAGE_BUCKET).list(id, { limit: 100, offset: 0 })
+  if (!listRes.error) {
+    const paths = (listRes.data ?? []).map((o) => `${id}/${o.name}`)
+    if (paths.length) {
+      await sb.storage.from(IMAGE_BUCKET).remove(paths)
+    }
+  }
 }
 
 export async function listProfiles(): Promise<Profile[]> {

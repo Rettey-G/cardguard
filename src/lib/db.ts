@@ -2,6 +2,7 @@ import { deleteDB, openDB, type DBSchema } from 'idb'
 import type {
   AppSettings,
   CardRecord,
+  CardAttachment,
   CardWithImage,
   Profile,
   RenewalProvider
@@ -9,6 +10,16 @@ import type {
 
 type CardImageRecord = {
   cardId: string
+  blob: Blob
+  updatedAt: number
+}
+
+type CardAttachmentRecord = {
+  key: string
+  cardId: string
+  attachmentId: string
+  name: string
+  contentType: string
   blob: Blob
   updatedAt: number
 }
@@ -22,6 +33,11 @@ interface CardGuardDb extends DBSchema {
   cardImages: {
     key: string
     value: CardImageRecord
+  }
+  cardAttachments: {
+    key: string
+    value: CardAttachmentRecord
+    indexes: { 'by-cardId': string }
   }
   profiles: {
     key: string
@@ -42,7 +58,7 @@ interface CardGuardDb extends DBSchema {
 }
 
 const DB_NAME = 'cardguard-db'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 const DEFAULT_KINDS: string[] = [
   'Passport',
@@ -73,6 +89,11 @@ export async function getDb() {
 
       if (!db.objectStoreNames.contains('cardImages')) {
         db.createObjectStore('cardImages', { keyPath: 'cardId' })
+      }
+
+      if (!db.objectStoreNames.contains('cardAttachments')) {
+        const atts = db.createObjectStore('cardAttachments', { keyPath: 'key' })
+        atts.createIndex('by-cardId', 'cardId')
       }
 
       if (!db.objectStoreNames.contains('profiles')) {
@@ -139,12 +160,29 @@ export async function getCard(id: string): Promise<CardWithImage | undefined> {
   const card = await db.get('cards', id)
   if (!card) return undefined
   const image = await db.get('cardImages', id)
-  return { ...card, imageBlob: image?.blob }
+
+  const attachmentRecords = await db.getAllFromIndex('cardAttachments', 'by-cardId', id)
+  const attachments: CardAttachment[] = attachmentRecords.map((r) => ({
+    id: r.attachmentId,
+    name: r.name,
+    contentType: r.contentType,
+    blob: r.blob
+  }))
+
+  const legacy = image?.blob
+  const imageBlob = legacy ?? attachments.find((a) => a.contentType.startsWith('image/'))?.blob
+
+  return {
+    ...card,
+    imageBlob,
+    attachments: attachments.length ? attachments : undefined
+  }
 }
 
 export async function upsertCard(input: {
   card: CardRecord
   imageBlob?: Blob
+  attachments?: CardAttachment[]
 }): Promise<void> {
   const db = await getDb()
   await db.put('cards', input.card)
@@ -155,12 +193,36 @@ export async function upsertCard(input: {
       updatedAt: Date.now()
     })
   }
+
+  if (input.attachments) {
+    const existing = await db.getAllFromIndex('cardAttachments', 'by-cardId', input.card.id)
+    for (const r of existing) {
+      await db.delete('cardAttachments', r.key)
+    }
+    const updatedAt = Date.now()
+    for (const a of input.attachments) {
+      const key = `${input.card.id}:${a.id}`
+      await db.put('cardAttachments', {
+        key,
+        cardId: input.card.id,
+        attachmentId: a.id,
+        name: a.name,
+        contentType: a.contentType,
+        blob: a.blob,
+        updatedAt
+      })
+    }
+  }
 }
 
 export async function deleteCard(id: string): Promise<void> {
   const db = await getDb()
   await db.delete('cards', id)
   await db.delete('cardImages', id)
+  const existing = await db.getAllFromIndex('cardAttachments', 'by-cardId', id)
+  for (const r of existing) {
+    await db.delete('cardAttachments', r.key)
+  }
 }
 
 export async function listProfiles(): Promise<Profile[]> {

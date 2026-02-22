@@ -27,8 +27,16 @@ export type CardRecord = {
   updatedAt: number
 }
 
+export type CardAttachment = {
+  id: string
+  name: string
+  contentType: string
+  blob: Blob
+}
+
 export type CardWithImage = CardRecord & {
   imageBlob?: Blob
+  attachments?: CardAttachment[]
 }
 
 export type AppSettings = {
