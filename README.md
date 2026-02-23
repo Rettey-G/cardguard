@@ -9,9 +9,14 @@ A modern web application for managing your cards (ID cards, passports, credit ca
 - 📱 **Mobile Responsive** - Works perfectly on phones and tablets
 - � **Multi-file Upload (Front/Back + PDF)** - Upload multiple images for both sides of an ID card, and store PDFs
 - ⏰ **Expiry Tracking** - Never miss an expiry date
-- 🔔 **Notifications** - Get reminded before cards expire
+- 🔔 **Multiple Reminders** - Set reminders at 30/14/7/1 days before expiry per card
+- 🗓️ **Calendar Integration** - Add renewal events to Google/Apple Calendar or download an `.ics`
+- ✅ **Renewal Steps / Checklist** - Track renewal requirements (required/optional steps + completion)
+- 🔗 **Renewal Providers + Instructions** - Deep link to renewal portals with saved search instructions
 - 👨‍👩‍👧‍👦 **Profiles / Dependents** - Organize cards profile-wise (Personal, Dad, Wife, etc.)
 - ✏️ **Rename Profiles** - Edit profile names anytime
+- 🔒 **App Lock (PIN)** - Optional 6-digit PIN lock and encrypted notes
+- 📷 **OCR Scanning** - Scan card images to detect key details (like expiry date)
 - 🌐 **Cross-Device Sync** - Access your cards from any device
 - 📊 **Visitor Analytics (Vercel)** - Track page views and visitors in the Vercel dashboard
 
@@ -92,6 +97,126 @@ git push
 
 # Go to https://vercel.com and your app will auto-deploy
 ```
+
+---
+
+## 🧑‍💻 How to Push to GitHub (Windows)
+
+Run these commands inside the project folder (example: `...\CardGuard`).
+
+### First-time setup (only once)
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
+### Daily workflow (edit -> test -> commit -> push)
+
+```bash
+# 1) Check what changed
+git status
+
+# 2) Stage changes
+git add .
+
+# 3) Commit
+git commit -m "feat: short description of what you changed"
+
+# 4) Push to GitHub
+git push origin master
+```
+
+### If you see: “LF will be replaced by CRLF”
+
+That message is a **warning** on Windows and is safe to ignore.
+
+### If push asks for login
+
+Use one of these:
+
+- **GitHub Desktop** (easiest)
+- **Personal Access Token (PAT)** when Git asks for password
+
+---
+
+## 🎥 Video / Demo Script (Full Feature Walkthrough)
+
+Use this as a script for a screen-recorded demo. Target length: ~2–4 minutes.
+
+### 1) Intro (10s)
+
+- Open the app.
+- “This is **CardGuard**, a secure card manager to store ID cards, passports, licenses, and credit cards with expiry tracking and renewal workflow.”
+
+### 2) Login + Security (15–25s)
+
+- Click **Continue with Google**.
+- Show **App Lock (PIN)** in Settings.
+- “Notes can be encrypted when App Lock is enabled.”
+
+### 3) Add a Card (30–45s)
+
+- Click **Add card**.
+- Fill:
+  - Type
+  - Expiry date
+  - Profile (optional)
+  - Title + Issuer
+  - Renew link (optional)
+  - Renewal provider (optional)
+- Upload:
+  - Front image
+  - Back image
+  - PDF (optional)
+- Optional: click **Scan image** to OCR and auto-detect expiry/details.
+- Save.
+
+### 4) Reminders (20–30s)
+
+- Open the same card in **Edit**.
+- Show reminder checkboxes:
+  - 30 / 14 / 7 / 1 days
+- “Reminders can be configured per-card, so different documents can have different schedules.”
+
+### 5) Renewal Workflow (30–45s)
+
+- In the card form, add **Renewal Steps**:
+  - Example: “Passport photo” (required)
+  - Example: “Old passport copy” (required)
+  - Example: “Appointment booking” (optional)
+- Save and open card view.
+- Show the steps list in the card view.
+
+### 6) Calendar Integration (15–25s)
+
+- Open card view.
+- Click **Add to Calendar**.
+- Demonstrate:
+  - **Google Calendar**
+  - **Apple Calendar**
+  - **Download .ics**
+
+### 7) Renewal Providers + Instructions (20–30s)
+
+- Open **Manage**.
+- Create a provider:
+  - Name
+  - Portal URL
+  - Search instructions (what to type/click in the portal)
+- Open card view and click **Renew**.
+- “It deep-links to the portal and shows the saved instructions.”
+
+### 8) Profiles / Dependents (15–25s)
+
+- Show grouping by profile.
+- Add a new profile.
+- Rename/delete profiles from **Manage**.
+
+### 9) Close (10s)
+
+- “CardGuard keeps everything in one place: cards + files + reminders + renewal workflow + calendar export.”
+- Mention: “Works on mobile, supports cloud sync (Supabase), and has local fallback.”
 
 ---
 
