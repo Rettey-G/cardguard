@@ -5,7 +5,9 @@ export interface Translation {
   addCard: string
   editCard: string
   cardTitle: string
+  cardTitlePlaceholder: string
   issuer: string
+  issuerPlaceholder: string
   expiryDate: string
   profile: string
   notes: string
@@ -45,7 +47,9 @@ export const translations: Record<Language, Translation> = {
     addCard: 'Add Card',
     editCard: 'Edit Card',
     cardTitle: 'Card Title',
+    cardTitlePlaceholder: 'e.g., Visa Platinum',
     issuer: 'Issuer',
+    issuerPlaceholder: 'e.g., Bank / Department',
     expiryDate: 'Expiry Date',
     profile: 'Profile',
     notes: 'Notes',
@@ -83,7 +87,9 @@ export const translations: Record<Language, Translation> = {
     addCard: 'ކާޑް އިތުރުކުރޭ',
     editCard: 'ކާޑް ބަދާލޭ',
     cardTitle: 'ކާޑްގެ ނަން',
+    cardTitlePlaceholder: 'މިސާލަ: ވީޒާ ޕްލެޓިނަމް',
     issuer: 'ދޫކުރާފައިވާ',
+    issuerPlaceholder: 'މިސާލަ: ބޭންކް / ޑިޕާޓްމަންޓް',
     expiryDate: 'މުއްދަން ފުރިހަމަވާ ތާރީޚް',
     profile: 'ޕްރޮފައިލް',
     notes: 'ނޯޓްސް',

@@ -1219,7 +1219,7 @@ export default function App() {
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g., Visa Platinum"
+                    placeholder={t.cardTitlePlaceholder}
                     required
                     className="rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
@@ -1230,7 +1230,7 @@ export default function App() {
                   <input
                     value={issuer}
                     onChange={(e) => setIssuer(e.target.value)}
-                    placeholder="e.g., Bank / Department"
+                    placeholder={t.issuerPlaceholder}
                     className="rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </label>
