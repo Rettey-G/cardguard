@@ -1006,11 +1006,19 @@ export default function App() {
                         <div className="flex items-start gap-4">
                           {/* Card Icon */}
                           <div className="flex-shrink-0">
-                            <div className="h-12 w-16 rounded-lg bg-gradient-to-br from-emerald-200 via-emerald-400 to-emerald-600 ring-1 ring-black/20 flex items-center justify-center">
-                              <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
+                            <div className="h-12 w-16 rounded-lg bg-gradient-to-br from-emerald-200 via-emerald-400 to-emerald-600 ring-1 ring-black/20 flex items-center justify-center overflow-hidden">
+                              {card.kind.toLowerCase().includes('driving') || card.kind.toLowerCase().includes('license') ? (
+                                <img src="/icons/driving licence.png" alt="Driving License" className="h-8 w-8 object-contain" />
+                              ) : card.kind.toLowerCase().includes('passport') ? (
+                                <img src="/icons/passport.png" alt="Passport" className="h-8 w-8 object-contain" />
+                              ) : card.kind.toLowerCase().includes('id') || card.kind.toLowerCase().includes('card') ? (
+                                <img src="/icons/id-card.png" alt="ID Card" className="h-8 w-8 object-contain" />
+                              ) : (
+                                <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                              )}
                             </div>
                           </div>
 
