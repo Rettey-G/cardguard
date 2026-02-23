@@ -947,32 +947,113 @@ export default function App() {
         <Auth onAuthChange={setUser} />
         <div className="mx-auto max-w-6xl px-4 py-6">
         {lockConfig.enabled && locked ? (
-          <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/80 p-4">
-            <div className="w-full max-w-sm rounded-2xl bg-slate-950 p-6 ring-1 ring-slate-800">
-              <div className="text-lg font-semibold text-slate-100">Locked</div>
-              <div className="mt-1 text-sm text-slate-400">Enter your 6-digit PIN to unlock.</div>
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4">
+            <div className="w-full max-w-sm rounded-3xl bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-slate-700/50">
+              {/* Branded Header */}
+              <div className="mb-8 flex flex-col items-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-2xl font-bold text-white shadow-lg">
+                  CG
+                </div>
+                <h2 className="text-xl font-bold text-slate-100">CardGuard</h2>
+                <p className="mt-1 text-sm text-slate-400">Enter your PIN to continue</p>
+              </div>
+
+              {/* PIN Dots Display */}
+              <div className="mb-6 flex justify-center gap-2">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-3 w-3 rounded-full transition-all duration-200 ${
+                      i < unlockPin.length
+                        ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40'
+                        : 'bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Hidden numeric input */}
               <input
                 value={unlockPin}
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, '').slice(0, 6)
                   setUnlockPin(v)
                   setUnlockError(null)
+                  if (v.length === 6) {
+                    setTimeout(() => onUnlock(), 100)
+                  }
                 }}
                 inputMode="numeric"
                 type="password"
-                placeholder="••••••"
-                className="mt-4 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                maxLength={6}
+                className="sr-only"
+                autoFocus
               />
-              {unlockError ? <div className="mt-2 text-xs text-red-300">{unlockError}</div> : null}
-              <div className="mt-4 flex gap-2">
+
+              {/* Keypad */}
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => {
+                      if (unlockPin.length < 6) {
+                        const newPin = unlockPin + num
+                        setUnlockPin(newPin)
+                        setUnlockError(null)
+                        if (newPin.length === 6) {
+                          setTimeout(() => onUnlock(), 100)
+                        }
+                      }
+                    }}
+                    className="rounded-2xl bg-slate-800 py-4 text-lg font-semibold text-slate-100 shadow-inner transition-all hover:bg-slate-700 active:scale-95 active:bg-slate-600"
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={unlockPin.length === 0}
+                  onClick={() => {
+                    setUnlockPin(unlockPin.slice(0, -1))
+                    setUnlockError(null)
+                  }}
+                  className="rounded-2xl bg-slate-800/40 py-4 text-sm font-medium text-slate-400 shadow-inner transition-all hover:bg-slate-700/40 active:scale-95 disabled:opacity-30"
+                >
+                  ⌫
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (unlockPin.length < 6) {
+                      const newPin = unlockPin + '0'
+                      setUnlockPin(newPin)
+                      setUnlockError(null)
+                      if (newPin.length === 6) {
+                        setTimeout(() => onUnlock(), 100)
+                      }
+                    }
+                  }}
+                  className="rounded-2xl bg-slate-800 py-4 text-lg font-semibold text-slate-100 shadow-inner transition-all hover:bg-slate-700 active:scale-95 active:bg-slate-600"
+                >
+                  0
+                </button>
                 <button
                   type="button"
                   onClick={onUnlock}
-                  className="flex-1 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+                  disabled={unlockPin.length === 0}
+                  className="rounded-2xl bg-emerald-500/10 py-4 text-sm font-medium text-emerald-400 shadow-inner transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-30"
                 >
-                  Unlock
+                  ✓
                 </button>
               </div>
+
+              {/* Error Message */}
+              {unlockError ? (
+                <div className="mt-4 text-center text-sm text-red-400 animate-pulse">
+                  {unlockError}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
