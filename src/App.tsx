@@ -213,8 +213,8 @@ export default function App() {
           await refresh()
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        setDbError(msg)
+        console.error('CardGuard local storage error:', err)
+        setDbError(null)
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,7 +344,7 @@ export default function App() {
       let profile
       
       if (profileId === 'personal') {
-        profile = { id: 'personal', name: 'Personal' }
+        profile = { id: 'personal', name: 'Personal', createdAt: 0 }
       } else {
         // Try to find profile by ID first
         profile = profiles.find(p => p.id === profileId)
@@ -353,7 +353,7 @@ export default function App() {
         // Move it to Personal instead of showing "Unknown Profile"
         if (!profile) {
           console.log(`Profile ${profileId} not found, moving to Personal`)
-          profile = { id: 'personal', name: 'Personal' }
+          profile = { id: 'personal', name: 'Personal', createdAt: 0 }
         }
       }
       
@@ -934,7 +934,7 @@ export default function App() {
         imageBlob: undefined,
         attachments: undefined
       })
-      await refreshCards()
+      await refresh()
     } finally {
       setBusy(false)
     }
@@ -1146,29 +1146,6 @@ export default function App() {
               ) : null}
             </div>
           </div>
-        ) : null}
-
-        {dbError ? (
-          <section className="mb-4 rounded-2xl bg-red-500/10 p-4 ring-1 ring-red-500/30">
-            <div className="text-sm font-semibold text-red-200">
-              Local storage error
-            </div>
-            <div className="mt-1 text-xs text-red-200/80 break-words">{dbError}</div>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-slate-200/80">
-                If you previously opened CardGuard in another tab, close it and reload. If the problem continues,
-                reset local data.
-              </div>
-              <button
-                disabled={busy}
-                onClick={onResetLocalData}
-                className="rounded-xl bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-100 ring-1 ring-red-500/30 hover:bg-red-500/20 disabled:opacity-60"
-              >
-                Reset local data
-              </button>
-            </div>
-          </section>
-
         ) : null}
 
         {/* App Lock */}
