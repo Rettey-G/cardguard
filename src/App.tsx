@@ -186,24 +186,36 @@ export default function App() {
     // Group cards by profile
     const groupedByProfile = filtered.reduce((acc, item) => {
       const profileId = item.card.profileId || 'personal'
-      const profile = profileId === 'personal' 
-        ? { id: 'personal', name: 'Personal' }
-        : profiles.find(p => p.id === profileId)
+      let profile
       
-      if (!acc[profileId]) {
-        acc[profileId] = {
-          profile: profile || { id: profileId, name: 'Unknown Profile' },
+      if (profileId === 'personal') {
+        profile = { id: 'personal', name: 'Personal' }
+      } else {
+        // Try to find profile by ID first
+        profile = profiles.find(p => p.id === profileId)
+        
+        // If not found by ID, the profile might have been deleted
+        // Move it to Personal instead of showing "Unknown Profile"
+        if (!profile) {
+          console.log(`Profile ${profileId} not found, moving to Personal`)
+          profile = { id: 'personal', name: 'Personal' }
+        }
+      }
+      
+      if (!acc[profile.id]) {
+        acc[profile.id] = {
+          profile: profile,
           cards: []
         }
       }
-      acc[profileId].cards.push(item)
+      acc[profile.id].cards.push(item)
       return acc
     }, {} as Record<string, { profile: Profile; cards: typeof filtered }>)
     
     const profileGroups = Object.values(groupedByProfile)
 
     return { filtered, expiringSoonCount, expiredCount, profileGroups }
-  }, [cards, filter, settings])
+  }, [cards, filter, settings, profiles])
 
   const viewingCard = useMemo(() => {
     if (!viewingId) return null
