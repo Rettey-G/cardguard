@@ -22,17 +22,19 @@ export async function resetDatabase(): Promise<void> {
 export async function getSettings(): Promise<AppSettings> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled').eq('user_id', userId).maybeSingle()
+  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled,defaultreminderdays').eq('user_id', userId).maybeSingle()
   if (error) throw error
   if (!data) {
     return {
       reminderDays: 30,
-      notificationsEnabled: false
+      notificationsEnabled: false,
+      defaultReminderDays: [30, 14, 7, 1]
     }
   }
   return {
     reminderDays: (data as any).reminderdays,
-    notificationsEnabled: (data as any).notificationsenabled
+    notificationsEnabled: (data as any).notificationsenabled,
+    defaultReminderDays: (data as any).defaultreminderdays || [30, 14, 7, 1]
   }
 }
 
@@ -41,7 +43,13 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   const userId = await getCurrentUserId()
   const { error } = await sb
     .from('settings')
-    .upsert({ key: 'app', reminderdays: settings.reminderDays, notificationsenabled: settings.notificationsEnabled, user_id: userId })
+    .upsert({ 
+      key: 'app', 
+      reminderdays: settings.reminderDays, 
+      notificationsenabled: settings.notificationsEnabled, 
+      defaultreminderdays: settings.defaultReminderDays,
+      user_id: userId 
+    })
   if (error) throw error
 }
 
@@ -222,17 +230,23 @@ export async function listRenewalProviders(): Promise<RenewalProvider[]> {
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     ...row,
-    createdAt: row.createdat
+    createdAt: row.createdat,
+    searchInstructions: row.searchinstructions
   })) as RenewalProvider[]
 }
 
-export async function createRenewalProvider(input: { name: string; url: string }): Promise<RenewalProvider> {
+export async function createRenewalProvider(input: { 
+  name: string; 
+  url: string; 
+  searchInstructions?: string 
+}): Promise<RenewalProvider> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
   const provider = {
     id: crypto.randomUUID(),
     name: input.name.trim(),
     url: input.url.trim(),
+    searchinstructions: input.searchInstructions?.trim() || null,
     createdat: Date.now(),
     user_id: userId
   }
@@ -242,6 +256,7 @@ export async function createRenewalProvider(input: { name: string; url: string }
     id: provider.id,
     name: provider.name,
     url: provider.url,
+    searchInstructions: provider.searchinstructions,
     createdAt: provider.createdat
   }
 }

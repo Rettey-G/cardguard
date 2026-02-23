@@ -140,7 +140,8 @@ export async function getSettings(): Promise<AppSettings> {
   return (
     existing ?? {
       reminderDays: 30,
-      notificationsEnabled: false
+      notificationsEnabled: false,
+      defaultReminderDays: [30, 14, 7, 1]
     }
   )
 }
@@ -261,12 +262,14 @@ export async function listRenewalProviders(): Promise<RenewalProvider[]> {
 export async function createRenewalProvider(input: {
   name: string
   url: string
+  searchInstructions?: string
 }): Promise<RenewalProvider> {
   const db = await getDb()
   const provider: RenewalProvider = {
     id: newId(),
     name: input.name.trim(),
     url: input.url.trim(),
+    searchInstructions: input.searchInstructions?.trim() || undefined,
     createdAt: Date.now()
   }
   await db.put('renewalProviders', provider)

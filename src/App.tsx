@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppSettings, CardAttachment, CardKind, CardRecord, Profile, RenewalProvider } from './lib/types'
+import type { AppSettings, CardAttachment, CardKind, CardRecord, Profile, RenewalProvider, RenewalStep } from './lib/types'
 import { daysUntil, isExpired } from './lib/expiry'
 import { scanCardImage } from './lib/ocr'
 import { Auth } from './components/Auth'
@@ -19,6 +19,7 @@ import {
   verifyPin,
   type LockConfig
 } from './lib/security'
+import { createGoogleCalendarUrl, createAppleCalendarUrl, downloadICSFile } from './lib/calendar'
 import {
   createCardKind,
   createProfile,
@@ -108,6 +109,18 @@ export default function App() {
   const [newProfileName, setNewProfileName] = useState('')
   const [newProviderName, setNewProviderName] = useState('')
   const [newProviderUrl, setNewProviderUrl] = useState('')
+  const [newProviderInstructions, setNewProviderInstructions] = useState('')
+
+  // Reminder settings
+  const [selectedReminderDays, setSelectedReminderDays] = useState<number[]>([30, 14, 7, 1])
+  const [showCalendarMenu, setShowCalendarMenu] = useState<string | null>(null) // cardId
+  
+  // Renewal steps
+  const [renewalStepsOpen, setRenewalStepsOpen] = useState<string | null>(null) // cardId
+  const [steps, setSteps] = useState<RenewalStep[]>([])
+  const [newStepTitle, setNewStepTitle] = useState('')
+  const [newStepDescription, setNewStepDescription] = useState('')
+  const [newStepRequired, setNewStepRequired] = useState(true)
 
   const [viewingId, setViewingId] = useState<string | null>(null)
   const [viewingTitle, setViewingTitle] = useState<string>('')
@@ -415,6 +428,8 @@ export default function App() {
     setRenewalProviderId('')
     setRenewUrl('')
     setNotes('')
+    setSelectedReminderDays([30, 14, 7, 1])
+    setSteps([])
     setScanMsg(null)
     if (fileRef.current) fileRef.current.value = ''
     setFormOpen(true)
@@ -436,6 +451,8 @@ export default function App() {
     setRenewalProviderId('')
     setRenewUrl('')
     setNotes('')
+    setSelectedReminderDays([30, 14, 7, 1])
+    setSteps([])
     setScanMsg(null)
     if (fileRef.current) fileRef.current.value = ''
     setFormOpen(true)
@@ -487,6 +504,8 @@ export default function App() {
     setViewingMissing(false)
     setViewingAttachments([])
     setViewingAttachmentIndex(0)
+    setShowCalendarMenu(null)
+    setRenewalStepsOpen(null)
     if (viewingUrl) {
       URL.revokeObjectURL(viewingUrl)
       setViewingUrl(null)
@@ -592,6 +611,8 @@ export default function App() {
     setRenewalProviderId(c.renewalProviderId ?? '')
     setRenewUrl(c.renewUrl ?? '')
     setNotes(c.notes ?? '')
+    setSelectedReminderDays(c.reminderDays ?? [30, 14, 7, 1])
+    setSteps(c.renewalSteps ?? [])
     setScanMsg(null)
     if (fileRef.current) fileRef.current.value = ''
     setFormOpen(true)
@@ -690,6 +711,8 @@ export default function App() {
         renewalProviderId: renewalProviderId || undefined,
         renewUrl: normalizeUrl(renewUrl) || undefined,
         notes: storedNotes,
+        reminderDays: selectedReminderDays.length > 0 ? selectedReminderDays : undefined,
+        renewalSteps: steps.length > 0 ? steps : undefined,
         createdAt: editingId ? cards.find((c) => c.id === editingId)?.createdAt ?? now : now,
         updatedAt: now
       }
@@ -746,19 +769,85 @@ export default function App() {
   }
 
   async function onAddProvider() {
-    const name = newProviderName.trim()
-    const url = normalizeUrl(newProviderUrl)
-    if (!name || !url) return
+    if (!newProviderName.trim() || !newProviderUrl.trim()) return
     setBusy(true)
     try {
-      await createRenewalProvider({ name, url })
+      await createRenewalProvider({ 
+        name: newProviderName.trim(), 
+        url: normalizeUrl(newProviderUrl.trim()) || '',
+        searchInstructions: newProviderInstructions.trim() || undefined
+      })
       setNewProviderName('')
       setNewProviderUrl('')
+      setNewProviderInstructions('')
       await refreshMeta()
     } finally {
       setBusy(false)
     }
   }
+
+  // Renewal steps helpers
+  function addRenewalStep() {
+    if (!newStepTitle.trim()) return
+    const newStep: RenewalStep = {
+      id: newId(),
+      title: newStepTitle.trim(),
+      description: newStepDescription.trim() || undefined,
+      required: newStepRequired,
+      completed: false,
+      order: steps.length,
+      documentIds: []
+    }
+    setSteps([...steps, newStep])
+    setNewStepTitle('')
+    setNewStepDescription('')
+    setNewStepRequired(true)
+  }
+
+  function updateRenewalStep(stepId: string, updates: Partial<RenewalStep>) {
+    setSteps(steps.map(s => s.id === stepId ? { ...s, ...updates } : s))
+  }
+
+  function deleteRenewalStep(stepId: string) {
+    setSteps(steps.filter(s => s.id !== stepId))
+  }
+
+  function moveRenewalStep(stepId: string, direction: 'up' | 'down') {
+    const index = steps.findIndex(s => s.id === stepId)
+    if (index === -1) return
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= steps.length) return
+    const newSteps = [...steps]
+    ;[newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]]
+    // Update order property
+    newSteps.forEach((s, i) => s.order = i)
+    setSteps(newSteps)
+  }
+
+  // Calendar helpers
+  function openRenewWithInstructions(cardId: string) {
+    const c = cards.find((x) => x.id === cardId)
+    if (!c) return
+
+    if (c.renewUrl) {
+      window.open(c.renewUrl, '_blank')
+      return
+    }
+
+    if (c.renewalProviderId) {
+      const provider = providers.find((p) => p.id === c.renewalProviderId)
+      if (provider?.url) {
+        window.open(provider.url, '_blank')
+        if (provider.searchInstructions) {
+          alert(`Provider Instructions: ${provider.searchInstructions}`)
+        }
+        return
+      }
+    }
+
+    alert('No renewal URL available for this card.')
+  }
+
 
   async function onDeleteKind(name: string) {
     const ok = window.confirm(`Delete card type "${name}"?`)
@@ -1652,6 +1741,145 @@ export default function App() {
                   {scanMsg ? <div className="text-xs text-slate-300">{scanMsg}</div> : null}
                 </div>
 
+                {/* Reminder Settings */}
+                <div className="grid gap-2">
+                  <div className="text-xs text-slate-300">{t.reminders}</div>
+                  <div className="grid gap-2">
+                    {[30, 14, 7, 1].map((days) => (
+                      <label key={days} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedReminderDays.includes(days)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedReminderDays([...selectedReminderDays, days].sort((a, b) => b - a))
+                            } else {
+                              setSelectedReminderDays(selectedReminderDays.filter(d => d !== days))
+                            }
+                          }}
+                          className="rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                        />
+                        <span className="text-sm text-slate-200">{t.days[days as keyof typeof t.days]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Renewal Steps */}
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-slate-300">{t.renewalSteps}</div>
+                    <button
+                      type="button"
+                      onClick={() => setRenewalStepsOpen('new')}
+                      className="rounded-xl bg-slate-800 px-3 py-1 text-xs text-slate-200 hover:bg-slate-700"
+                    >
+                      {t.addStep}
+                    </button>
+                  </div>
+                  
+                  {steps.length > 0 && (
+                    <div className="grid gap-2">
+                      {steps.sort((a, b) => a.order - b.order).map((step, index) => (
+                        <div key={step.id} className="rounded-xl bg-slate-900 p-3 ring-1 ring-slate-700">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-400">{index + 1}.</span>
+                                <span className="text-sm font-medium text-slate-100">{step.title}</span>
+                                {step.required && <span className="text-xs text-red-400">*</span>}
+                                {step.completed && <span className="text-xs text-emerald-400">✓</span>}
+                              </div>
+                              {step.description && (
+                                <div className="mt-1 text-xs text-slate-400">{step.description}</div>
+                              )}
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveRenewalStep(step.id, 'up')}
+                                disabled={index === 0}
+                                className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 disabled:opacity-50"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveRenewalStep(step.id, 'down')}
+                                disabled={index === steps.length - 1}
+                                className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 disabled:opacity-50"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteRenewalStep(step.id)}
+                                className="rounded px-2 py-1 text-xs text-red-400 hover:bg-slate-800"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {renewalStepsOpen === 'new' && (
+                    <div className="rounded-xl bg-slate-900 p-3 ring-1 ring-slate-700">
+                      <div className="grid gap-2">
+                        <input
+                          value={newStepTitle}
+                          onChange={(e) => setNewStepTitle(e.target.value)}
+                          placeholder={t.stepTitle}
+                          className="rounded-lg bg-slate-800 px-3 py-2 text-sm ring-1 ring-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <textarea
+                          value={newStepDescription}
+                          onChange={(e) => setNewStepDescription(e.target.value)}
+                          placeholder={t.stepDescription}
+                          rows={2}
+                          className="rounded-lg bg-slate-800 px-3 py-2 text-sm ring-1 ring-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={newStepRequired}
+                            onChange={(e) => setNewStepRequired(e.target.checked)}
+                            className="rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                          />
+                          <span className="text-sm text-slate-200">{t.required}</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addRenewalStep()
+                              setRenewalStepsOpen(null)
+                            }}
+                            disabled={!newStepTitle.trim()}
+                            className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-emerald-400 disabled:opacity-60"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenewalStepsOpen(null)
+                              setNewStepTitle('')
+                              setNewStepDescription('')
+                              setNewStepRequired(true)
+                            }}
+                            className="rounded-lg bg-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <label className="grid gap-1">
                   <span className="text-xs text-slate-300">{t.notes} (optional)</span>
                   <textarea
@@ -1844,6 +2072,80 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/95 px-5 py-4 backdrop-blur">
+                {/* Calendar Integration */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCalendarMenu(showCalendarMenu === viewingId ? null : viewingId)}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                  >
+                    {t.addToCalendar}
+                  </button>
+                  
+                  {showCalendarMenu === viewingId && viewingCard && (
+                    <div className="absolute bottom-full mb-2 right-0 w-48 rounded-xl bg-slate-900 p-2 ring-1 ring-slate-700 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = createGoogleCalendarUrl(
+                            `${viewingCard.title} Renewal`,
+                            viewingCard.expiryDate,
+                            undefined,
+                            `Card renewal for ${viewingCard.title}${viewingCard.issuer ? ` (${viewingCard.issuer})` : ''}`
+                          )
+                          window.open(url, '_blank')
+                          setShowCalendarMenu(null)
+                        }}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800"
+                      >
+                        Google Calendar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = createAppleCalendarUrl(
+                            `${viewingCard.title} Renewal`,
+                            viewingCard.expiryDate,
+                            undefined,
+                            `Card renewal for ${viewingCard.title}${viewingCard.issuer ? ` (${viewingCard.issuer})` : ''}`
+                          )
+                          window.open(url, '_blank')
+                          setShowCalendarMenu(null)
+                        }}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800"
+                      >
+                        Apple Calendar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          downloadICSFile(
+                            `${viewingCard.title} Renewal`,
+                            viewingCard.expiryDate,
+                            undefined,
+                            `Card renewal for ${viewingCard.title}${viewingCard.issuer ? ` (${viewingCard.issuer})` : ''}`
+                          )
+                          setShowCalendarMenu(null)
+                        }}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800"
+                      >
+                        Download .ics
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Enhanced Renew Button with Instructions */}
+                {viewingCard?.renewUrl || viewingCard?.renewalProviderId ? (
+                  <button
+                    type="button"
+                    onClick={() => openRenewWithInstructions(viewingId)}
+                    className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-blue-400"
+                  >
+                    {t.renew}
+                  </button>
+                ) : null}
+
                 {viewingAttachments.length ? (
                   <button
                     type="button"
@@ -1871,6 +2173,48 @@ export default function App() {
                   Share
                 </button>
               </div>
+
+              {/* Renewal Steps Section */}
+              {viewingCard?.renewalSteps && viewingCard.renewalSteps.length > 0 && (
+                <div className="border-t border-slate-800 bg-slate-950/95 px-5 py-4">
+                  <div className="mb-3 text-sm font-semibold text-slate-200">{t.renewalSteps}</div>
+                  <div className="grid gap-2">
+                    {viewingCard.renewalSteps.sort((a, b) => a.order - b.order).map((step, index) => (
+                      <div key={step.id} className="rounded-xl bg-slate-900 p-3 ring-1 ring-slate-700">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5">
+                            <div className={`h-4 w-4 rounded-full border-2 ${
+                              step.completed 
+                                ? 'border-emerald-500 bg-emerald-500' 
+                                : 'border-slate-600 bg-slate-800'
+                            }`}>
+                              {step.completed && (
+                                <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-100">{step.title}</span>
+                              {step.required && <span className="text-xs text-red-400">*</span>}
+                            </div>
+                            {step.description && (
+                              <div className="mt-1 text-xs text-slate-400">{step.description}</div>
+                            )}
+                            {step.documentIds && step.documentIds.length > 0 && (
+                              <div className="mt-2 text-xs text-slate-400">
+                                {t.attachDocuments}: {step.documentIds.length} file(s)
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : null}
@@ -1991,6 +2335,15 @@ export default function App() {
                     />
                   </div>
                   <div className="mt-2">
+                    <textarea
+                      value={newProviderInstructions}
+                      onChange={(e) => setNewProviderInstructions(e.target.value)}
+                      placeholder={t.searchInstructions}
+                      rows={2}
+                      className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="mt-2">
                     <button
                       disabled={busy}
                       onClick={onAddProvider}
@@ -2008,9 +2361,12 @@ export default function App() {
                           key={p.id}
                           className="flex flex-col gap-2 rounded-xl bg-slate-950/40 px-3 py-2 ring-1 ring-slate-800 sm:flex-row sm:items-center sm:justify-between"
                         >
-                          <div>
+                          <div className="flex-1">
                             <div className="text-sm text-slate-200">{p.name}</div>
                             <div className="text-xs text-slate-400 break-all">{p.url}</div>
+                            {p.searchInstructions && (
+                              <div className="mt-1 text-xs text-slate-500 italic">{p.searchInstructions}</div>
+                            )}
                           </div>
                           <button
                             disabled={busy}

@@ -10,6 +10,7 @@ export type RenewalProvider = {
   id: string
   name: string
   url: string
+  searchInstructions?: string // e.g. "Enter card number in the search field"
   createdAt: number
 }
 
@@ -23,6 +24,8 @@ export type CardRecord = {
   profileId?: string
   renewalProviderId?: string
   notes?: string
+  reminderDays?: number[] // e.g. [30, 14, 7, 1]
+  renewalSteps?: RenewalStep[]
   createdAt: number
   updatedAt: number
 }
@@ -34,6 +37,16 @@ export type CardAttachment = {
   blob: Blob
 }
 
+export type RenewalStep = {
+  id: string
+  title: string
+  description?: string
+  required: boolean
+  completed: boolean
+  documentIds?: string[] // attachment IDs
+  order: number
+}
+
 export type CardWithImage = CardRecord & {
   imageBlob?: Blob
   attachments?: CardAttachment[]
@@ -42,4 +55,5 @@ export type CardWithImage = CardRecord & {
 export type AppSettings = {
   reminderDays: number
   notificationsEnabled: boolean
+  defaultReminderDays: number[] // default for new cards
 }
