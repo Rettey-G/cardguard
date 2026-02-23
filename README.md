@@ -7,10 +7,13 @@ A modern web application for managing your cards (ID cards, passports, credit ca
 - 🔐 **Google OAuth Authentication** - Secure login with your Google account
 - ☁️ **Cloud Storage** - All data saved to Supabase (free tier)
 - 📱 **Mobile Responsive** - Works perfectly on phones and tablets
-- 📸 **Image Upload** - Add photos of your cards
+- � **Multi-file Upload (Front/Back + PDF)** - Upload multiple images for both sides of an ID card, and store PDFs
 - ⏰ **Expiry Tracking** - Never miss an expiry date
 - 🔔 **Notifications** - Get reminded before cards expire
+- 👨‍👩‍👧‍👦 **Profiles / Dependents** - Organize cards profile-wise (Personal, Dad, Wife, etc.)
+- ✏️ **Rename Profiles** - Edit profile names anytime
 - 🌐 **Cross-Device Sync** - Access your cards from any device
+- 📊 **Visitor Analytics (Vercel)** - Track page views and visitors in the Vercel dashboard
 
 ## Quick Start
 
@@ -170,9 +173,18 @@ git push
 
 ### Data Storage
 - **Cards**: Stored in Supabase PostgreSQL
-- **Images**: Stored in Supabase Storage
+- **Files (Images + PDF)**: Stored in Supabase Storage (supports multiple attachments per card)
 - **Settings**: User preferences in database
 - **Local Fallback**: IndexedDB when offline
+
+### Profiles
+- Cards can be assigned to a profile (e.g., Personal / Dad / Wife)
+- Home page displays cards grouped by profile
+- Profiles can be renamed from the Manage panel
+
+### Analytics
+- Vercel Analytics can be enabled from the Vercel project dashboard
+- After deployment, visit the site to start collecting page views
 
 ### Security
 - Row Level Security (RLS) on all tables
