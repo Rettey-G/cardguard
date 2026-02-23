@@ -1056,11 +1056,11 @@ export default function App() {
                               </span>
                               {expired ? (
                                 <span className="rounded-full bg-red-500/15 px-2 py-1 text-xs text-red-200 ring-1 ring-red-500/30">
-                                  Expired
+                                  {t.expired}
                                 </span>
                               ) : expiringSoon ? (
                                 <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200 ring-1 ring-amber-500/30">
-                                  Expiring soon
+                                  {t.expiringSoon}
                                 </span>
                               ) : null}
                             </div>
@@ -1187,7 +1187,7 @@ export default function App() {
                   </label>
 
                   <label className="grid gap-1">
-                    <span className="text-xs text-slate-300">Expiry date</span>
+                    <span className="text-xs text-slate-300">{t.expiryDate}</span>
                     <input
                       value={expiryDate}
                       onChange={(e) => setExpiryDate(e.target.value)}
@@ -1199,7 +1199,7 @@ export default function App() {
                 </div>
 
                 <label className="grid gap-1">
-                  <span className="text-xs text-slate-300">Profile / Dependent (optional)</span>
+                  <span className="text-xs text-slate-300">{t.profile} / Dependent (optional)</span>
                   <select
                     value={profileId}
                     onChange={(e) => setProfileId(e.target.value)}
@@ -1215,7 +1215,7 @@ export default function App() {
                 </label>
 
                 <label className="grid gap-1">
-                  <span className="text-xs text-slate-300">Card name</span>
+                  <span className="text-xs text-slate-300">{t.cardTitle}</span>
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -1226,7 +1226,7 @@ export default function App() {
                 </label>
 
                 <label className="grid gap-1">
-                  <span className="text-xs text-slate-300">Issuer (optional)</span>
+                  <span className="text-xs text-slate-300">{t.issuer} (optional)</span>
                   <input
                     value={issuer}
                     onChange={(e) => setIssuer(e.target.value)}
@@ -1286,7 +1286,7 @@ export default function App() {
                 </div>
 
                 <label className="grid gap-1">
-                  <span className="text-xs text-slate-300">Notes (optional)</span>
+                  <span className="text-xs text-slate-300">{t.notes} (optional)</span>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -1302,14 +1302,14 @@ export default function App() {
                     onClick={() => setFormOpen(false)}
                     className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
                   >
-                    Cancel
+                    {t.cancel}
                   </button>
                   <button
                     disabled={busy}
                     type="submit"
                     className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400 active:bg-emerald-600 disabled:opacity-60"
                   >
-                    Save
+                    {t.save}
                   </button>
                 </div>
               </form>
