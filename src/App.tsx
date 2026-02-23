@@ -112,6 +112,8 @@ export default function App() {
   const [newProviderUrl, setNewProviderUrl] = useState('')
   const [newProviderInstructions, setNewProviderInstructions] = useState('')
 
+  const seededVehicleKindsRef = useRef(false)
+
   // Reminder settings
   const [selectedReminderDays, setSelectedReminderDays] = useState<number[]>([30, 14, 7, 1])
   const [showCalendarMenu, setShowCalendarMenu] = useState<string | null>(null) // cardId
@@ -185,17 +187,32 @@ export default function App() {
   }
 
   async function refreshMeta() {
-    const [kinds, p, prov] = await Promise.all([
-      listCardKinds(),
-      listProfiles(),
-      listRenewalProviders()
-    ])
-    setCardKinds(kinds)
+    const [kinds0, p, prov] = await Promise.all([listCardKinds(), listProfiles(), listRenewalProviders()])
+
+    if (!seededVehicleKindsRef.current) {
+      const mustHave = ['Vehicle Insurance', 'Roadworthiness', 'Annual Fee']
+      const missing = mustHave.filter((x) => !kinds0.includes(x))
+      if (missing.length > 0) {
+        seededVehicleKindsRef.current = true
+        await Promise.all(missing.map((k) => createCardKind(k)))
+        const kinds1 = await listCardKinds()
+        setCardKinds(kinds1)
+        setProfiles(p)
+        setProviders(prov)
+        if (!kind && kinds1.length > 0 && formOpen) {
+          setKind(kinds1[0])
+        }
+        return
+      }
+      seededVehicleKindsRef.current = true
+    }
+
+    setCardKinds(kinds0)
     setProfiles(p)
     setProviders(prov)
     // Set default card kind if none selected and form is open
-    if (!kind && kinds.length > 0 && formOpen) {
-      setKind(kinds[0])
+    if (!kind && kinds0.length > 0 && formOpen) {
+      setKind(kinds0[0])
     }
   }
 

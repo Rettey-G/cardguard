@@ -66,6 +66,9 @@ const DEFAULT_KINDS: string[] = [
   'Driving License',
   'Credit Card',
   'Debit Card',
+  'Vehicle Insurance',
+  'Roadworthiness',
+  'Annual Fee',
   'Insurance Card',
   'Membership Card',
   'Other'
