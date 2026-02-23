@@ -10,6 +10,16 @@ import type { Language, Translation } from './lib/translations'
 import { useTranslation, formatDays } from './lib/translations'
 import './styles/dhivehi.css'
 import {
+  createPinVerifier,
+  encryptNote,
+  decryptNote,
+  deriveNotesKey,
+  loadLockConfig,
+  saveLockConfig,
+  verifyPin,
+  type LockConfig
+} from './lib/security'
+import {
   createCardKind,
   createProfile,
   updateProfile,
@@ -77,6 +87,15 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [language, setLanguage] = useState<Language>('en')
 
+  const [lockConfig, setLockConfig] = useState<LockConfig>(() => loadLockConfig())
+  const [locked, setLocked] = useState(false)
+  const [unlockPin, setUnlockPin] = useState('')
+  const [unlockError, setUnlockError] = useState<string | null>(null)
+  const [notesKey, setNotesKey] = useState<CryptoKey | null>(null)
+  const [pinSetupOpen, setPinSetupOpen] = useState(false)
+  const [newPin, setNewPin] = useState('')
+  const [newPin2, setNewPin2] = useState('')
+
   const [dbError, setDbError] = useState<string | null>(null)
   const t = useTranslation(language)
 
@@ -119,6 +138,35 @@ export default function App() {
   async function refresh() {
     const all = await listCards()
     all.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))
+
+    // If lock is enabled, decrypt notes only when unlocked.
+    if (lockConfig.enabled) {
+      if (!notesKey) {
+        // Do not keep encrypted notes in memory when locked.
+        setCards(
+          all.map((c) => ({
+            ...c,
+            notes: undefined
+          }))
+        )
+        return
+      }
+
+      const decrypted = await Promise.all(
+        all.map(async (c) => {
+          if (!c.notes) return c
+          try {
+            const plain = await decryptNote(c.notes, notesKey)
+            return { ...c, notes: plain }
+          } catch {
+            return { ...c, notes: undefined }
+          }
+        })
+      )
+      setCards(decrypted)
+      return
+    }
+
     setCards(all)
   }
 
@@ -138,17 +186,105 @@ export default function App() {
   }
 
   useEffect(() => {
+    // Lock immediately on load if enabled.
+    setLocked(lockConfig.enabled)
+
     ;(async () => {
       try {
         const s = await getSettings()
         setSettings(s)
-        await Promise.all([refresh(), refreshMeta()])
+        await refreshMeta()
+        // Only load cards if not locked.
+        if (!lockConfig.enabled) {
+          await refresh()
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         setDbError(msg)
       }
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    function onVis() {
+      if (!lockConfig.enabled) return
+      if (document.hidden) {
+        setLocked(true)
+        setUnlockPin('')
+        setUnlockError(null)
+        setNotesKey(null)
+        setCards([])
+        setFormOpen(false)
+        setManageOpen(false)
+        closeView()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [lockConfig.enabled])
+
+  async function onUnlock() {
+    if (!lockConfig.enabled) return
+    if (!unlockPin || unlockPin.length !== 6) {
+      setUnlockError('Enter 6-digit PIN')
+      return
+    }
+    const ok = await verifyPin(unlockPin, lockConfig)
+    if (!ok) {
+      setUnlockError('Incorrect PIN')
+      return
+    }
+    if (!lockConfig.pinSaltB64) {
+      setUnlockError('PIN not configured')
+      return
+    }
+
+    try {
+      const key = await deriveNotesKey(unlockPin, lockConfig.pinSaltB64)
+      setNotesKey(key)
+      setLocked(false)
+      setUnlockPin('')
+      setUnlockError(null)
+      await refresh()
+      await refreshMeta()
+    } catch (e) {
+      setUnlockError(e instanceof Error ? e.message : 'Unlock failed')
+    }
+  }
+
+  async function enableLockWithNewPin() {
+    if (newPin.length !== 6 || newPin2.length !== 6) {
+      setUnlockError('PIN must be 6 digits')
+      return
+    }
+    if (newPin !== newPin2) {
+      setUnlockError('PINs do not match')
+      return
+    }
+
+    const { pinSaltB64, pinVerifierB64 } = await createPinVerifier(newPin)
+    const cfg: LockConfig = { enabled: true, pinSaltB64, pinVerifierB64 }
+    saveLockConfig(cfg)
+    setLockConfig(cfg)
+    setNotesKey(null)
+    setLocked(true)
+    setPinSetupOpen(false)
+    setNewPin('')
+    setNewPin2('')
+    setUnlockPin('')
+    setUnlockError(null)
+    setCards([])
+  }
+
+  function disableLock() {
+    const cfg: LockConfig = { enabled: false, pinSaltB64: null, pinVerifierB64: null }
+    saveLockConfig(cfg)
+    setLockConfig(cfg)
+    setLocked(false)
+    setNotesKey(null)
+    setUnlockError(null)
+  }
 
   async function onResetLocalData() {
     const ok = window.confirm(
@@ -531,12 +667,21 @@ export default function App() {
     if (!expiryDate) return
     if (!title.trim()) return
 
+    if (lockConfig.enabled && !notesKey) {
+      return
+    }
+
     setBusy(true)
     try {
       const now = Date.now()
-      const id = editingId ?? newId()
+
+      let storedNotes: string | undefined = notes.trim() ? notes.trim() : undefined
+      if (lockConfig.enabled && storedNotes && notesKey) {
+        storedNotes = await encryptNote(storedNotes, notesKey)
+      }
+
       const card: CardRecord = {
-        id,
+        id: editingId ?? newId(),
         kind,
         title: title.trim(),
         issuer: issuer.trim() ? issuer.trim() : undefined,
@@ -544,7 +689,7 @@ export default function App() {
         profileId: profileId || undefined,
         renewalProviderId: renewalProviderId || undefined,
         renewUrl: normalizeUrl(renewUrl) || undefined,
-        notes: notes.trim() ? notes.trim() : undefined,
+        notes: storedNotes,
         createdAt: editingId ? cards.find((c) => c.id === editingId)?.createdAt ?? now : now,
         updatedAt: now
       }
@@ -801,6 +946,37 @@ export default function App() {
       >
         <Auth onAuthChange={setUser} />
         <div className="mx-auto max-w-6xl px-4 py-6">
+        {lockConfig.enabled && locked ? (
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/80 p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-slate-950 p-6 ring-1 ring-slate-800">
+              <div className="text-lg font-semibold text-slate-100">Locked</div>
+              <div className="mt-1 text-sm text-slate-400">Enter your 6-digit PIN to unlock.</div>
+              <input
+                value={unlockPin}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 6)
+                  setUnlockPin(v)
+                  setUnlockError(null)
+                }}
+                inputMode="numeric"
+                type="password"
+                placeholder="••••••"
+                className="mt-4 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {unlockError ? <div className="mt-2 text-xs text-red-300">{unlockError}</div> : null}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={onUnlock}
+                  className="flex-1 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+                >
+                  Unlock
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {dbError ? (
           <section className="mb-4 rounded-2xl bg-red-500/10 p-4 ring-1 ring-red-500/30">
             <div className="text-sm font-semibold text-red-200">
@@ -821,7 +997,84 @@ export default function App() {
               </button>
             </div>
           </section>
+
         ) : null}
+
+        {/* App Lock */}
+        <section className="mb-8">
+          <div className="rounded-xl bg-slate-950/40 p-4 ring-1 ring-slate-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-100">App Lock</div>
+                <div className="text-xs text-slate-400">Locks the app when you background it. Uses a 6-digit PIN.</div>
+              </div>
+              {lockConfig.enabled ? (
+                <button
+                  type="button"
+                  onClick={disableLock}
+                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                >
+                  Disable
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinSetupOpen(true)
+                    setUnlockError(null)
+                  }}
+                  className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15"
+                >
+                  Enable
+                </button>
+              )}
+            </div>
+
+            {pinSetupOpen ? (
+              <div className="mt-4 grid gap-2">
+                <div className="text-xs text-slate-300">Set a new 6-digit PIN</div>
+                <input
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  type="password"
+                  placeholder="New PIN"
+                  className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <input
+                  value={newPin2}
+                  onChange={(e) => setNewPin2(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  type="password"
+                  placeholder="Confirm PIN"
+                  className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {unlockError ? <div className="text-xs text-red-300">{unlockError}</div> : null}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPinSetupOpen(false)
+                      setNewPin('')
+                      setNewPin2('')
+                      setUnlockError(null)
+                    }}
+                    className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enableLockWithNewPin}
+                    className="flex-1 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+                  >
+                    Save PIN
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
 
         {/* Hero Section */}
         <header className="mb-8 text-center">
