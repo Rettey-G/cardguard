@@ -616,13 +616,30 @@ export default function App() {
     }
   }
 
-  async function onRenameProfile(id: string, currentName: string) {
-    const next = window.prompt('Rename profile', currentName)
-    if (!next) return
-    if (!next.trim()) return
+  async function onRenameProfile() {
+    if (profiles.length === 0) {
+      alert('No profiles to rename')
+      return
+    }
+    
+    const choice = window.prompt(
+      `Choose profile to rename:\n\n` +
+      profiles.map((p, i) => `${i + 1}. ${p.name}`).join('\n') +
+      `\n\nEnter number (1-${profiles.length}):`
+    )
+    
+    if (!choice) return
+    const index = parseInt(choice) - 1
+    if (isNaN(index) || index < 0 || index >= profiles.length) return
+    
+    const profile = profiles[index]
+    const newName = window.prompt(`Rename "${profile.name}" to:`, profile.name)
+    if (!newName) return
+    if (!newName.trim()) return
+    
     setBusy(true)
     try {
-      await updateProfile({ id, name: next.trim() })
+      await updateProfile({ id: profile.id, name: newName.trim() })
       await refreshMeta()
     } finally {
       setBusy(false)
@@ -954,7 +971,7 @@ export default function App() {
                       {profile.id !== 'personal' && (
                         <button
                           disabled={busy}
-                          onClick={() => onRenameProfile(profile.id, profile.name)}
+                          onClick={() => onRenameProfile()}
                           className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
                         >
                           Rename
@@ -1478,7 +1495,7 @@ export default function App() {
                           <div className="flex items-center gap-2">
                             <button
                               disabled={busy}
-                              onClick={() => onRenameProfile(p.id, p.name)}
+                              onClick={() => onRenameProfile()}
                               className="rounded-lg bg-slate-900 px-3 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
                             >
                               Rename
