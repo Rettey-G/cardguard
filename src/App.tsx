@@ -914,7 +914,7 @@ export default function App() {
               <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              <span className="text-sm text-slate-300">Reminder window:</span>
+              <span className="text-sm text-slate-300">{t.reminderDays}:</span>
               <input
                 type="number"
                 min={1}
@@ -923,7 +923,7 @@ export default function App() {
                 onChange={(e) => updateReminderDays(Number(e.target.value))}
                 className="w-20 rounded-lg bg-slate-800 px-3 py-1 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <span className="text-sm text-slate-300">days before expiry</span>
+              <span className="text-sm text-slate-300">{t.daysBeforeExpiry}</span>
             </div>
             <button
               onClick={() => toggleNotifications(!settings?.notificationsEnabled)}
@@ -933,7 +933,7 @@ export default function App() {
                   : 'bg-slate-800 text-slate-400 ring-1 ring-slate-700 hover:bg-slate-700'
               }`}
             >
-              {settings?.notificationsEnabled ? 'Notifications On' : 'Notifications Off'}
+              {settings?.notificationsEnabled ? t.notificationsOn : t.notificationsOff}
             </button>
           </div>
         </section>
@@ -969,28 +969,28 @@ export default function App() {
                   <button
                     key={m}
                     onClick={() => setFilter(m)}
-                  className={`rounded-xl px-3 py-2 text-sm ring-1 ring-slate-800 ${
-                    filter === m
-                      ? 'bg-slate-50 text-slate-950'
-                      : 'bg-slate-950/30 text-slate-200 hover:bg-slate-900'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+                    className={`rounded-xl px-3 py-2 text-sm ring-1 ring-slate-800 ${
+                      filter === m
+                        ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30'
+                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    {m === 'All' ? t.filterAll : m === 'Expiring' ? t.filterExpiring : t.filterExpired}
+                  </button>
+                ))}
+              </div>
 
-            <label className="flex items-center gap-3 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
-              <input
-                type="checkbox"
-                checked={settings?.notificationsEnabled ?? false}
-                onChange={(e) => toggleNotifications(e.target.checked)}
-              />
-              <span className="text-slate-200">Notifications</span>
-              <span className="text-xs text-slate-400">(when supported)</span>
-            </label>
-          </div>
-        </section>
+              <label className="flex items-center gap-3 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                <input
+                  type="checkbox"
+                  checked={settings?.notificationsEnabled ?? false}
+                  onChange={(e) => toggleNotifications(e.target.checked)}
+                />
+                <span className="text-slate-200">{t.notifications}</span>
+                <span className="text-xs text-slate-400">(when supported)</span>
+              </label>
+            </div>
+          </section>
         )}
 
         <section className="mt-6">

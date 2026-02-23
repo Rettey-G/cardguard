@@ -39,6 +39,12 @@ export interface Translation {
   daysOverdue: string
   expired: string
   expiringSoon: string
+  filterAll: string
+  filterExpiring: string
+  filterExpired: string
+  daysBeforeExpiry: string
+  notificationsOn: string
+  notificationsOff: string
 }
 
 export const translations: Record<Language, Translation> = {
@@ -80,7 +86,13 @@ export const translations: Record<Language, Translation> = {
     daysLeft: '{0} day(s) left',
     daysOverdue: '{0} day(s) overdue',
     expired: 'Expired',
-    expiringSoon: 'Expiring soon'
+    expiringSoon: 'Expiring soon',
+    filterAll: 'All',
+    filterExpiring: 'Expiring',
+    filterExpired: 'Expired',
+    daysBeforeExpiry: 'days before expiry',
+    notificationsOn: 'Notifications On',
+    notificationsOff: 'Notifications Off'
   },
   dv: {
     appTitle: 'ކާޑްގާޑް',
@@ -120,7 +132,13 @@ export const translations: Record<Language, Translation> = {
     daysLeft: '{0} ދުވަހުގެ ތެރޭގައި',
     daysOverdue: '{0} ދުވަހުގެ ފަހުން',
     expired: 'މުއްދަން ފުރިހަމަވެއްޖެ',
-    expiringSoon: 'ހަމަވާނީ އަވަހަށް'
+    expiringSoon: 'ހަމަވާނީ އަވަހަށް',
+    filterAll: 'ހުރިހާ',
+    filterExpiring: 'މުއްދަން ހަމަވާ',
+    filterExpired: 'މުއްދަން ފުރިހަމަވެއްޖެ',
+    daysBeforeExpiry: 'މުއްދަން ފުރިހަމަވުމުގެ ކުރިން ދުވަސްތައް',
+    notificationsOn: 'ނޮޓިފިކޭޝަންސް އޯން',
+    notificationsOff: 'ނޮޓިފިކޭޝަންސް އޮފް'
   }
 }
 
