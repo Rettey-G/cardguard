@@ -1182,7 +1182,7 @@ export default function App() {
                         </svg>
                       </div>
                       <div className="rounded-2xl bg-slate-950/30 px-3 py-2 text-xs text-slate-200 ring-1 ring-slate-800">
-                        CardGuard
+                        CardGuard v2.0
                       </div>
                     </div>
 
