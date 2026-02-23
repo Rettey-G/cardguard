@@ -34,6 +34,18 @@ export interface Translation {
   reminderDays: string
   notifications: string
   language: string
+  theme: string
+  about: string
+  privacy: string
+  source: string
+  lock: string
+  enableLock: string
+  setPin: string
+  confirmPin: string
+  pinsMustMatch: string
+  disableLock: string
+  notificationsOn: string
+  notificationsOff: string
   expiresToday: string
   daysLeft: string
   daysOverdue: string
@@ -43,8 +55,27 @@ export interface Translation {
   filterExpiring: string
   filterExpired: string
   daysBeforeExpiry: string
-  notificationsOn: string
-  notificationsOff: string
+  reminders: string
+  reminderDaysBefore: string
+  defaultReminders: string
+  calendarIntegration: string
+  addToCalendar: string
+  renewalSteps: string
+  addStep: string
+  stepTitle: string
+  stepDescription: string
+  required: string
+  completed: string
+  attachDocuments: string
+  providerInstructions: string
+  searchInstructions: string
+  selectDays: string
+  days: {
+    30: string
+    14: string
+    7: string
+    1: string
+  }
 }
 
 export const translations: Record<Language, Translation> = {
@@ -82,6 +113,16 @@ export const translations: Record<Language, Translation> = {
     reminderDays: 'Reminder days',
     notifications: 'Notifications',
     language: 'Language',
+    theme: 'Theme',
+    about: 'About',
+    privacy: 'Privacy',
+    source: 'Source',
+    lock: 'App Lock',
+    enableLock: 'Enable App Lock',
+    setPin: 'Set 6-digit PIN',
+    confirmPin: 'Confirm PIN',
+    pinsMustMatch: 'PINs must match',
+    disableLock: 'Disable App Lock',
     expiresToday: 'Expires today',
     daysLeft: '{0} day(s) left',
     daysOverdue: '{0} day(s) overdue',
@@ -113,22 +154,6 @@ export const translations: Record<Language, Translation> = {
       14: '14 days before',
       7: '7 days before',
       1: '1 day before'
-    },
-    settings: {
-      title: 'Settings',
-      language: 'Language',
-      theme: 'Theme',
-      about: 'About',
-      privacy: 'Privacy',
-      source: 'Source',
-      lock: 'App Lock',
-      enableLock: 'Enable App Lock',
-      setPin: 'Set 6-digit PIN',
-      confirmPin: 'Confirm PIN',
-      pinsMustMatch: 'PINs must match',
-      disableLock: 'Disable App Lock',
-      notificationsOn: 'Notifications On',
-      notificationsOff: 'Notifications Off'
     }
   },
   dv: {
@@ -161,10 +186,20 @@ export const translations: Record<Language, Translation> = {
     addProvider: 'ޕްރޮވައިޑަރު އިތުރުކުރޭ',
     providerName: 'ޕްރޮވައިޑަރުގެ ނަން (މިސާލަ: ޕާސްޕޯޓް ޕޯޓަލް)',
     providerUrl: 'https://...',
-    settings: 'ސެޓިންގްސް',
+    settings: 'ސެޓިންގސް',
     reminderDays: 'ރިމައިންޑަރ ދުވަސްތައް',
     notifications: 'ނޮޓިފިކޭޝަންސް',
     language: 'ބަހުރުވައް',
+    theme: 'ތީމް',
+    about: 'ހަމަތަ',
+    privacy: 'ރައްކައުވަން',
+    source: 'މަސްދަރު',
+    lock: 'އެޕް ލޮކް',
+    enableLock: 'އެޕް ލޮކް އޯންކުރޭ',
+    setPin: '6 ޑިޖިޓް PIN ސެޓްކުރޭ',
+    confirmPin: 'PIN ޔަގީންކުރޭ',
+    pinsMustMatch: 'PINސް އެއްވުމަކަށް ޖެހޭ',
+    disableLock: 'އެޕް ލޮކް އޮފްކުރޭ',
     expiresToday: 'މިއަދު މުއްދަން ފުރިހަމަވެއްޖެ',
     daysLeft: '{0} ދުވަހުގެ ތެރޭގައި',
     daysOverdue: '{0} ދުވަހުގެ ފަހުން',
@@ -196,43 +231,6 @@ export const translations: Record<Language, Translation> = {
       14: '14 ދުވަހުގެ ކުރިން',
       7: '7 ދުވަހުގެ ކުރިން',
       1: '1 ދުވަހުގެ ކުރިން'
-    },
-    settings: {
-      title: 'ސެޓިންގސް',
-      language: 'ބަސް',
-      theme: 'ތީމް',
-      about: 'ހަމަތަ',
-      privacy: 'ރައްކައުވަން',
-      source: 'މަސްދަރު',
-      lock: 'އެޕް ލޮކް',
-      enableLock: 'އެޕް ލޮކް އޯންކުރޭ',
-      setPin: '6 ޑިޖިޓް PIN ސެޓްކުރޭ',
-      confirmPin: 'PIN ޔަގީންކުރޭ',
-      pinsMustMatch: 'PINސް އެއްވުމަކަށް ޖެހޭ',
-      disableLock: 'އެޕް ލޮކް އޮފްކުރޭ',
-      notificationsOn: 'ނޮޓިފިކޭޝަންސް އޯން',
-      notificationsOff: 'ނޮޓިފިކޭޝަންސް އޮފް',
-      reminders: 'ހަމަވާނަމަ ފޮނުވާ',
-      reminderDaysBefore: 'މުއްދަތު ހަމަވުމުގެ ކުރިން ހަމަވާނަމަ ދުވަސްތައް',
-      defaultReminders: 'އާ ކާޑުތަކަށް ޑިފޯލްޓް ހަމަވާނަމަ ދުވަސްތައް',
-      calendarIntegration: 'ކެލެންޑަރު އިންޓެގްރޭޝަން',
-      addToCalendar: 'ކެލެންޑަރަށް އިއްދައިން',
-      renewalSteps: 'އަލުން ހެދުމުގެ ފިޔަވަޅުތައް',
-      addStep: 'ފިޔަވަޅު އިއްދައިން',
-      stepTitle: 'ފިޔަވަޅުގެ ނަން',
-      stepDescription: 'ތަފްސީލް (އޮޕްޝަނަލް)',
-      required: 'ލާބައްވާ',
-      completed: 'ނިންިގުނު',
-      attachDocuments: 'ސިއްހީ ބިލުތައް އެއްލުމަށް',
-      providerInstructions: 'ޕްރޮވައިޑަރުގެ އިންސްޓްރަކްޝަންސް',
-      searchInstructions: 'ޕްރޮވައިޑަރު ޕޯޓަލްގައި ހޯދުމުގެ އިންސްޓްރަކްޝަންސް',
-      selectDays: 'ހަމަވާނަމަ ދުވަސްތައް އިންގޭ',
-      days: {
-        30: '30 ދުވަހުގެ ކުރިން',
-        14: '14 ދުވަހުގެ ކުރިން',
-        7: '7 ދުވަހުގެ ކުރިން',
-        1: '1 ދުވަހުގެ ކުރިން'
-      }
     }
   }
 }
