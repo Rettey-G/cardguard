@@ -995,9 +995,7 @@ export default function App() {
 
         <section className="mt-6">
           {derived.filtered.length === 0 ? (
-            <div className="rounded-2xl bg-slate-900/40 p-6 text-center text-sm text-slate-300 ring-1 ring-slate-800">
-              No cards yet. Click <span className="font-semibold text-slate-50">Add card</span>.
-            </div>
+            <div className="rounded-2xl bg-slate-900/40 p-6 text-center text-sm text-slate-300 ring-1 ring-slate-800" dangerouslySetInnerHTML={{ __html: t.noCards }} />
           ) : (
             <div className="space-y-6">
               {derived.profileGroups.map(({ profile, cards }) => (
@@ -1013,7 +1011,7 @@ export default function App() {
                           onClick={() => onRenameProfile()}
                           className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
                         >
-                          Rename
+                          {t.rename}
                         </button>
                       )}
                     </div>
@@ -1021,7 +1019,7 @@ export default function App() {
                       onClick={() => openAddForProfile(profile.id === 'personal' ? '' : profile.id)}
                       className="rounded-xl bg-emerald-500/10 px-3 py-1 text-sm text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15"
                     >
-                      + Add card
+                      + {t.addCard}
                     </button>
                   </div>
                   <div className="grid gap-3">
@@ -1114,7 +1112,7 @@ export default function App() {
                               onClick={() => openView(card.id)}
                               className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
                             >
-                              View files
+                              {t.viewFiles}
                             </button>
 
                             <button
@@ -1122,7 +1120,7 @@ export default function App() {
                               onClick={() => onMoveCard(card.id)}
                               className="rounded-xl bg-blue-500/10 px-3 py-2 text-sm text-blue-200 ring-1 ring-blue-500/30 hover:bg-blue-500/15 disabled:opacity-60"
                             >
-                              Move
+                              {t.move}
                             </button>
 
                             <button
@@ -1130,14 +1128,14 @@ export default function App() {
                               onClick={() => openEdit(card.id)}
                               className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
                             >
-                              Edit
+                              {t.edit}
                             </button>
                             <button
                               disabled={busy}
                               onClick={() => onDelete(card.id)}
                               className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
                             >
-                              Delete
+                              {t.delete}
                             </button>
                           </div>
                         </div>
