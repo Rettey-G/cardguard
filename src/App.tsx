@@ -735,6 +735,29 @@ export default function App() {
     }
   }
 
+  function openRenew(cardId: string) {
+    const c = cards.find((x) => x.id === cardId)
+    if (!c) return
+    
+    // First try to use the card's direct renewUrl
+    if (c.renewUrl) {
+      window.open(c.renewUrl, '_blank')
+      return
+    }
+    
+    // If no direct URL, try to find the renewal provider
+    if (c.renewalProviderId) {
+      const provider = providers.find((p) => p.id === c.renewalProviderId)
+      if (provider?.url) {
+        window.open(provider.url, '_blank')
+        return
+      }
+    }
+    
+    // If no renewal URL found, show alert
+    alert('No renewal URL available for this card.')
+  }
+
   async function toggleNotifications(next: boolean) {
     if (!settings) return
 
@@ -1094,16 +1117,16 @@ export default function App() {
                                 onClick={() => openRenew(card.id)}
                                 className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
                               >
-                                Renew now
+                                {t.renew}
                               </button>
                             )}
-                            {card.renewalUrl && (
+                            {card.renewUrl && (
                               <button
                                 disabled={busy}
-                                onClick={() => window.open(card.renewalUrl, '_blank')}
+                                onClick={() => window.open(card.renewUrl, '_blank')}
                                 className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
                               >
-                                Add renew link
+                                {t.renew}
                               </button>
                             )}
 
