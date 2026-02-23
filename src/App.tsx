@@ -6,6 +6,9 @@ import { Auth } from './components/Auth'
 import type { User } from '@supabase/supabase-js'
 import html2canvas from 'html2canvas'
 import { Analytics } from '@vercel/analytics/react'
+import type { Language, Translation } from './lib/translations'
+import { useTranslation, formatDays } from './lib/translations'
+import './styles/dhivehi.css'
 import {
   createCardKind,
   createProfile,
@@ -72,8 +75,10 @@ export default function App() {
   const [filter, setFilter] = useState<FilterMode>('All')
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [busy, setBusy] = useState(false)
+  const [language, setLanguage] = useState<Language>('en')
 
   const [dbError, setDbError] = useState<string | null>(null)
+  const t = useTranslation(language)
 
   const [cardKinds, setCardKinds] = useState<CardKind[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -813,7 +818,7 @@ export default function App() {
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Add Your First Card
+              {t.addCardButton}
             </span>
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-600 opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
@@ -821,7 +826,7 @@ export default function App() {
             onClick={() => setManageOpen(true)}
             className="rounded-xl bg-slate-800/50 px-8 py-3 text-base font-medium text-slate-200 ring-1 ring-slate-700 transition-all hover:bg-slate-800 sm:px-6 sm:py-2 sm:text-sm"
           >
-            Manage Cards
+            {t.manageCards}
           </button>
         </div>
 
@@ -929,6 +934,28 @@ export default function App() {
               }`}
             >
               {settings?.notificationsEnabled ? 'Notifications On' : 'Notifications Off'}
+            </button>
+          </div>
+        </section>
+
+        {/* Language Toggle */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between rounded-xl bg-slate-950/40 p-4 ring-1 ring-slate-800">
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+              </svg>
+              <span className="text-sm text-slate-300">Language / ބަހުރުވައް:</span>
+            </div>
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'dv' : 'en')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                language === 'dv'
+                  ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30 dhivehi-font'
+                  : 'bg-slate-800 text-slate-400 ring-1 ring-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              {language === 'en' ? 'English' : 'ދިވެހިބަސް'}
             </button>
           </div>
         </section>
@@ -1342,7 +1369,7 @@ export default function App() {
                         </svg>
                       </div>
                       <div className="rounded-2xl bg-slate-950/30 px-3 py-2 text-xs text-slate-200 ring-1 ring-slate-800">
-                        CardGuard v2.0
+                        {t.appTitle} v2.0
                       </div>
                     </div>
 
