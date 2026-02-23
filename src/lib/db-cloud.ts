@@ -197,6 +197,17 @@ export async function createProfile(name: string): Promise<Profile> {
   }
 }
 
+export async function updateProfile(input: { id: string; name: string }): Promise<void> {
+  const sb = requireClient()
+  const userId = await getCurrentUserId()
+  const { error } = await sb
+    .from('profiles')
+    .update({ name: input.name.trim() })
+    .eq('id', input.id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function deleteProfile(id: string): Promise<void> {
   const sb = requireClient()
   const userId = await getCurrentUserId()

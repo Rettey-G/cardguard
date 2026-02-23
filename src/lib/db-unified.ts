@@ -13,6 +13,7 @@ export const upsertCard = impl.upsertCard
 export const deleteCard = impl.deleteCard
 export const listProfiles = impl.listProfiles
 export const createProfile = impl.createProfile
+export const updateProfile = (impl as any).updateProfile
 export const deleteProfile = impl.deleteProfile
 export const listRenewalProviders = impl.listRenewalProviders
 export const createRenewalProvider = impl.createRenewalProvider

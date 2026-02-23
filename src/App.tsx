@@ -9,6 +9,7 @@ import { Analytics } from '@vercel/analytics/react'
 import {
   createCardKind,
   createProfile,
+  updateProfile,
   createRenewalProvider,
   deleteCardKind,
   deleteCard,
@@ -569,6 +570,19 @@ export default function App() {
     setBusy(true)
     try {
       await deleteProfile(id)
+      await refreshMeta()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onRenameProfile(id: string, currentName: string) {
+    const next = window.prompt('Rename profile', currentName)
+    if (!next) return
+    if (!next.trim()) return
+    setBusy(true)
+    try {
+      await updateProfile({ id, name: next.trim() })
       await refreshMeta()
     } finally {
       setBusy(false)
@@ -1360,13 +1374,22 @@ export default function App() {
                           className="flex items-center justify-between gap-3 rounded-xl bg-slate-950/40 px-3 py-2 ring-1 ring-slate-800"
                         >
                           <div className="text-sm text-slate-200">{p.name}</div>
-                          <button
-                            disabled={busy}
-                            onClick={() => onDeleteProfile(p.id, p.name)}
-                            className="rounded-lg bg-red-500/10 px-3 py-1 text-xs text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
-                          >
-                            Delete
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              disabled={busy}
+                              onClick={() => onRenameProfile(p.id, p.name)}
+                              className="rounded-lg bg-slate-900 px-3 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
+                            >
+                              Rename
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() => onDeleteProfile(p.id, p.name)}
+                              className="rounded-lg bg-red-500/10 px-3 py-1 text-xs text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}

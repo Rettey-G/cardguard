@@ -239,6 +239,13 @@ export async function createProfile(name: string): Promise<Profile> {
   return profile
 }
 
+export async function updateProfile(input: { id: string; name: string }): Promise<void> {
+  const db = await getDb()
+  const existing = await db.get('profiles', input.id)
+  if (!existing) return
+  await db.put('profiles', { ...existing, name: input.name.trim() })
+}
+
 export async function deleteProfile(id: string): Promise<void> {
   const db = await getDb()
   await db.delete('profiles', id)
