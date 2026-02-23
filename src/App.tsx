@@ -183,7 +183,26 @@ export default function App() {
     const expiringSoonCount = by.filter((x) => x.expiringSoon).length
     const expiredCount = by.filter((x) => x.expired).length
 
-    return { filtered, expiringSoonCount, expiredCount }
+    // Group cards by profile
+    const groupedByProfile = filtered.reduce((acc, item) => {
+      const profileId = item.card.profileId || 'personal'
+      const profile = profileId === 'personal' 
+        ? { id: 'personal', name: 'Personal' }
+        : profiles.find(p => p.id === profileId)
+      
+      if (!acc[profileId]) {
+        acc[profileId] = {
+          profile: profile || { id: profileId, name: 'Unknown Profile' },
+          cards: []
+        }
+      }
+      acc[profileId].cards.push(item)
+      return acc
+    }, {} as Record<string, { profile: Profile; cards: typeof filtered }>)
+    
+    const profileGroups = Object.values(groupedByProfile)
+
+    return { filtered, expiringSoonCount, expiredCount, profileGroups }
   }, [cards, filter, settings])
 
   const viewingCard = useMemo(() => {
@@ -240,6 +259,27 @@ export default function App() {
     setIssuer('')
     setExpiryDate('')
     setProfileId('')
+    setRenewalProviderId('')
+    setRenewUrl('')
+    setNotes('')
+    setScanMsg(null)
+    if (fileRef.current) fileRef.current.value = ''
+    setFormOpen(true)
+  }
+
+  function openAddForProfile(nextProfileId: string) {
+    setEditingId(null)
+    // If no card kinds exist, don't open the form yet
+    if (cardKinds.length === 0) {
+      alert('Please wait while card types are being loaded...')
+      return
+    }
+    // Set the first available card kind
+    setKind(cardKinds[0])
+    setTitle('')
+    setIssuer('')
+    setExpiryDate('')
+    setProfileId(nextProfileId) // Pre-fill profile
     setRenewalProviderId('')
     setRenewUrl('')
     setNotes('')
@@ -867,97 +907,103 @@ export default function App() {
               No cards yet. Click <span className="font-semibold text-slate-50">Add card</span>.
             </div>
           ) : (
-            <div className="grid gap-3">
-              {derived.filtered.map(({ card, days, expired, expiringSoon }) => (
-                <article
-                  key={card.id}
-                  className="rounded-2xl bg-slate-900/40 p-4 ring-1 ring-slate-800"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-base font-semibold">{card.title}</h2>
-                        <span className="rounded-full bg-slate-950/40 px-2 py-1 text-xs text-slate-300 ring-1 ring-slate-800">
-                          {card.kind}
-                        </span>
-                        {card.profileId ? (
-                          <span className="rounded-full bg-slate-950/40 px-2 py-1 text-xs text-slate-300 ring-1 ring-slate-800">
-                            {profiles.find((p) => p.id === card.profileId)?.name ?? 'Profile'}
-                          </span>
-                        ) : null}
-                        {expired ? (
-                          <span className="rounded-full bg-red-500/15 px-2 py-1 text-xs text-red-200 ring-1 ring-red-500/30">
-                            Expired
-                          </span>
-                        ) : expiringSoon ? (
-                          <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200 ring-1 ring-amber-500/30">
-                            Expiring soon
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-xs text-emerald-200 ring-1 ring-emerald-500/30">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      {card.issuer ? (
-                        <div className="mt-1 text-sm text-slate-300">{card.issuer}</div>
-                      ) : null}
-                      <div className="mt-2 text-sm">
-                        <span className="text-slate-400">Expiry:</span>{' '}
-                        <span className="font-medium text-slate-100">{card.expiryDate}</span>
-                        <span className="ml-2 text-slate-300">({formatDaysLabel(days)})</span>
-                      </div>
-                      {card.notes ? (
-                        <div className="mt-2 whitespace-pre-wrap text-sm text-slate-300">
-                          {card.notes}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      {card.renewUrl ? (
-                        <a
-                          href={card.renewUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-xl bg-slate-50 px-3 py-2 text-center text-sm font-semibold text-slate-950 hover:bg-white"
-                        >
-                          Renew
-                        </a>
-                      ) : (
-                        <button
-                          onClick={() => openEdit(card.id)}
-                          className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900"
-                        >
-                          Add renew link
-                        </button>
-                      )}
-
-                      <button
-                        disabled={busy}
-                        onClick={() => openView(card.id)}
-                        className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
-                      >
-                        View image
-                      </button>
-
-                      <button
-                        disabled={busy}
-                        onClick={() => openEdit(card.id)}
-                        className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        disabled={busy}
-                        onClick={() => onDelete(card.id)}
-                        className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
-                      >
-                        Delete
-                      </button>
-                    </div>
+            <div className="space-y-6">
+              {derived.profileGroups.map(({ profile, cards }) => (
+                <div key={profile.id}>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-100">
+                      {profile.name}
+                    </h3>
+                    <button
+                      onClick={() => openAddForProfile(profile.id === 'personal' ? '' : profile.id)}
+                      className="rounded-xl bg-emerald-500/10 px-3 py-1 text-sm text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15"
+                    >
+                      + Add card
+                    </button>
                   </div>
-                </article>
+                  <div className="grid gap-3">
+                    {cards.map(({ card, days, expired, expiringSoon }) => (
+                      <article
+                        key={card.id}
+                        className="rounded-2xl bg-slate-900/40 p-4 ring-1 ring-slate-800"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="text-base font-semibold">{card.title}</h2>
+                              <span className="rounded-full bg-slate-950/40 px-2 py-1 text-xs text-slate-300 ring-1 ring-slate-800">
+                                {card.kind}
+                              </span>
+                              {expired ? (
+                                <span className="rounded-full bg-red-500/15 px-2 py-1 text-xs text-red-200 ring-1 ring-red-500/30">
+                                  Expired
+                                </span>
+                              ) : expiringSoon ? (
+                                <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200 ring-1 ring-amber-500/30">
+                                  Expiring soon
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-1 text-sm text-slate-400">
+                              {card.issuer}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              Expires: {new Date(card.expiryDate).toLocaleDateString()}
+                            </div>
+                            {card.notes && (
+                              <div className="mt-2 text-xs text-slate-300">
+                                {card.notes}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {expired && (
+                              <button
+                                disabled={busy}
+                                onClick={() => openRenew(card.id)}
+                                className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
+                              >
+                                Renew now
+                              </button>
+                            )}
+                            {card.renewalUrl && (
+                              <button
+                                disabled={busy}
+                                onClick={() => window.open(card.renewalUrl, '_blank')}
+                                className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
+                              >
+                                Add renew link
+                              </button>
+                            )}
+
+                            <button
+                              disabled={busy}
+                              onClick={() => openView(card.id)}
+                              className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
+                            >
+                              View files
+                            </button>
+
+                            <button
+                              disabled={busy}
+                              onClick={() => openEdit(card.id)}
+                              className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() => onDelete(card.id)}
+                              className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}
