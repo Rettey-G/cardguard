@@ -550,12 +550,18 @@ export default function App() {
       }
 
       const files = Array.from(fileRef.current?.files ?? [])
-      const attachments: CardAttachment[] = files.map((f, idx) => ({
-        id: `${String(idx + 1).padStart(2, '0')}-${f.name}`,
-        name: f.name,
-        contentType: f.type || 'application/octet-stream',
-        blob: f.slice(0, f.size, f.type)
-      }))
+      const attachments: CardAttachment[] = files.map((f, idx) => {
+        const nameLower = f.name.toLowerCase()
+        const contentType =
+          f.type || (nameLower.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream')
+
+        return {
+          id: `${String(idx + 1).padStart(2, '0')}-${f.name}`,
+          name: f.name,
+          contentType,
+          blob: f.slice(0, f.size, contentType)
+        }
+      })
 
       const firstImage = files.find((f) => f.type.startsWith('image/'))
       const imageBlob = firstImage ? firstImage.slice(0, firstImage.size, firstImage.type) : undefined
@@ -1446,27 +1452,52 @@ export default function App() {
                             </div>
                           ) : null}
 
-                          {viewingAttachments[viewingAttachmentIndex]?.contentType === 'application/pdf' ? (
-                            <object
-                              data={viewingUrl}
-                              type="application/pdf"
-                              className="h-[60vh] w-full rounded-2xl ring-1 ring-slate-800"
-                            >
+                          {(() => {
+                            const a = viewingAttachments[viewingAttachmentIndex]
+                            const nameLower = a?.name?.toLowerCase?.() ?? ''
+                            const isPdf = a?.contentType === 'application/pdf' || nameLower.endsWith('.pdf')
+                            const isImage = a?.contentType?.startsWith('image/')
+
+                            if (isPdf) {
+                              return (
+                                <div className="grid gap-3">
+                                  <a
+                                    href={viewingUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                                  >
+                                    Open PDF
+                                  </a>
+                                  <object
+                                    data={viewingUrl}
+                                    type="application/pdf"
+                                    className="h-[60vh] w-full rounded-2xl ring-1 ring-slate-800"
+                                  >
+                                    <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
+                                      PDF preview not supported in this browser. Use Open PDF or Download.
+                                    </div>
+                                  </object>
+                                </div>
+                              )
+                            }
+
+                            if (isImage) {
+                              return (
+                                <img
+                                  src={viewingUrl}
+                                  alt={viewingTitle}
+                                  className="w-full rounded-2xl ring-1 ring-slate-800"
+                                />
+                              )
+                            }
+
+                            return (
                               <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
-                                PDF preview not supported in this browser. Use Download.
+                                Preview not available. Use Download.
                               </div>
-                            </object>
-                          ) : viewingAttachments[viewingAttachmentIndex]?.contentType?.startsWith('image/') ? (
-                            <img
-                              src={viewingUrl}
-                              alt={viewingTitle}
-                              className="w-full rounded-2xl ring-1 ring-slate-800"
-                            />
-                          ) : (
-                            <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
-                              Preview not available. Use Download.
-                            </div>
-                          )}
+                            )
+                          })()}
                         </div>
                       ) : (
                         <div className="rounded-2xl bg-slate-950/40 p-4 text-sm text-slate-300 ring-1 ring-slate-800">
