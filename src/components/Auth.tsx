@@ -7,10 +7,17 @@ interface AuthProps {
 }
 
 export function Auth({ onAuthChange }: AuthProps) {
+  const LOGO_SRC = '/image/CardGuard%20logo%20with%20shield%20and%20card.png'
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
+    if (!supabase) {
+      setUser(null)
+      onAuthChange(null)
+      setLoading(false)
+      return
+    }
     // Check initial auth state
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -31,6 +38,7 @@ export function Auth({ onAuthChange }: AuthProps) {
   }, [onAuthChange])
 
   const signInWithGoogle = async () => {
+    if (!supabase) return
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -41,6 +49,7 @@ export function Auth({ onAuthChange }: AuthProps) {
   }
 
   const signOut = async () => {
+    if (!supabase) return
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Error signing out:', error)
   }
@@ -61,6 +70,9 @@ export function Auth({ onAuthChange }: AuthProps) {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
+            <div className="mb-4 flex justify-center">
+              <img src={LOGO_SRC} alt="CardGuard" className="h-16 w-16 object-contain" />
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">CardGuard</h1>
             <p className="text-gray-600 mb-8">Your personal card manager</p>
           </div>

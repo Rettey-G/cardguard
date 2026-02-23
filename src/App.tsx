@@ -81,6 +81,7 @@ function pseudoCardNumber(seed: string | null | undefined): string {
 }
 
 export default function App() {
+  const LOGO_SRC = '/image/CardGuard%20logo%20with%20shield%20and%20card.png'
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<CardRecord[]>([])
   const [filter, setFilter] = useState<FilterMode>('All')
@@ -1040,8 +1041,8 @@ export default function App() {
             <div className="w-full max-w-sm rounded-3xl bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl ring-1 ring-slate-700/50">
               {/* Branded Header */}
               <div className="mb-8 flex flex-col items-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-2xl font-bold text-white shadow-lg">
-                  CG
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-2xl font-bold text-white shadow-lg overflow-hidden">
+                  <img src={LOGO_SRC} alt="CardGuard" className="h-full w-full object-contain" />
                 </div>
                 <h2 className="text-xl font-bold text-slate-100">CardGuard</h2>
                 <p className="mt-1 text-sm text-slate-400">Enter your PIN to continue</p>
@@ -1249,9 +1250,7 @@ export default function App() {
         {/* Hero Section */}
         <header className="mb-8 text-center">
           <div className="mb-6 inline-flex items-center justify-center rounded-2xl bg-emerald-500/10 p-4 ring-1 ring-emerald-500/20">
-            <svg className="h-12 w-12 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
+            <img src={LOGO_SRC} alt="CardGuard" className="h-12 w-12 object-contain" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
             Card<span className="text-emerald-400">Guard</span>
@@ -2221,7 +2220,7 @@ export default function App() {
 
         {manageOpen ? (
           <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4">
-            <div className="w-full max-w-2xl rounded-2xl bg-slate-950 p-5 ring-1 ring-slate-800">
+            <div className="flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-slate-950 p-5 ring-1 ring-slate-800">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-lg font-semibold">Manage</div>
@@ -2235,7 +2234,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="mt-5 grid gap-6">
+              <div className="mt-5 grid min-h-0 flex-1 gap-6 overflow-y-auto">
                 <section className="rounded-2xl bg-slate-900/40 p-4 ring-1 ring-slate-800">
                   <div className="text-sm font-semibold">Custom card types</div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
