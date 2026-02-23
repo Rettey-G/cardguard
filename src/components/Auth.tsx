@@ -7,7 +7,7 @@ interface AuthProps {
 }
 
 export function Auth({ onAuthChange }: AuthProps) {
-  const LOGO_SRC = '/image/CardGuard%20logo%20with%20shield%20and%20card.png'
+  const LOGO_SRC = '/image/CardGuard%20logo.png'
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
 

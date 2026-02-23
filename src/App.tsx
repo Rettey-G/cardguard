@@ -81,7 +81,7 @@ function pseudoCardNumber(seed: string | null | undefined): string {
 }
 
 export default function App() {
-  const LOGO_SRC = '/image/CardGuard%20logo%20with%20shield%20and%20card.png'
+  const LOGO_SRC = '/image/CardGuard%20logo.png'
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<CardRecord[]>([])
   const [filter, setFilter] = useState<FilterMode>('All')
