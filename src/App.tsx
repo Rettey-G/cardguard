@@ -629,6 +629,42 @@ export default function App() {
     }
   }
 
+  async function onMoveCard(cardId: string) {
+    const card = cards.find(c => c.id === cardId)
+    if (!card) return
+    
+    const options = [
+      { id: '', name: 'Personal' },
+      ...profiles.map(p => ({ id: p.id, name: p.name }))
+    ]
+    
+    const currentLabel = card.profileId 
+      ? options.find(o => o.id === card.profileId)?.name || 'Unknown'
+      : 'Personal'
+    
+    const choice = window.prompt(
+      `Move "${card.title}" from "${currentLabel}" to:\n\n` +
+      options.map((o, i) => `${i + 1}. ${o.name}`).join('\n') +
+      `\n\nEnter number (1-${options.length}):`
+    )
+    
+    if (!choice) return
+    const index = parseInt(choice) - 1
+    if (isNaN(index) || index < 0 || index >= options.length) return
+    
+    setBusy(true)
+    try {
+      await upsertCard({ 
+        card: { ...card, profileId: options[index].id },
+        imageBlob: undefined,
+        attachments: undefined
+      })
+      await refreshCards()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function onDeleteProvider(id: string, name: string) {
     const ok = window.confirm(`Delete renewal provider "${name}"?`)
     if (!ok) return
@@ -911,9 +947,20 @@ export default function App() {
               {derived.profileGroups.map(({ profile, cards }) => (
                 <div key={profile.id}>
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-slate-100">
-                      {profile.name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-slate-100">
+                        {profile.name}
+                      </h3>
+                      {profile.id !== 'personal' && (
+                        <button
+                          disabled={busy}
+                          onClick={() => onRenameProfile(profile.id, profile.name)}
+                          className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
+                        >
+                          Rename
+                        </button>
+                      )}
+                    </div>
                     <button
                       onClick={() => openAddForProfile(profile.id === 'personal' ? '' : profile.id)}
                       className="rounded-xl bg-emerald-500/10 px-3 py-1 text-sm text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15"
@@ -982,6 +1029,14 @@ export default function App() {
                               className="rounded-xl bg-slate-950/30 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-900 disabled:opacity-60"
                             >
                               View files
+                            </button>
+
+                            <button
+                              disabled={busy}
+                              onClick={() => onMoveCard(card.id)}
+                              className="rounded-xl bg-blue-500/10 px-3 py-2 text-sm text-blue-200 ring-1 ring-blue-500/30 hover:bg-blue-500/15 disabled:opacity-60"
+                            >
+                              Move
                             </button>
 
                             <button
