@@ -788,7 +788,11 @@ export default function App() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
+      <div
+        className={`min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50 ${
+          language === 'dv' ? 'dhivehi-font dhivehi-text' : ''
+        }`}
+      >
         <Auth onAuthChange={setUser} />
         <div className="mx-auto max-w-6xl px-4 py-6">
         {dbError ? (

@@ -1,5 +1,5 @@
 @font-face {
-  font-family: 'A_Waheed';
+  font-family: 'Dhivehi';
   src: url('/fonts/Dhivehi.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
@@ -7,7 +7,7 @@
 }
 
 .dhivehi-font {
-  font-family: 'A_Waheed', 'MV Faseyha', 'Faruma', sans-serif;
+  font-family: 'Dhivehi', 'MV Faseyha', 'Faruma', sans-serif;
   direction: rtl;
   text-align: right;
 }
