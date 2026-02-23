@@ -1,7 +1,6 @@
 @font-face {
   font-family: 'A_Waheed';
-  src: url('/fonts/A_Waheed.woff2') format('woff2'),
-       url('/fonts/A_Waheed.woff') format('woff');
+  src: url('/fonts/Dhivehi.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
