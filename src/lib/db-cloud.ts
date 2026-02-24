@@ -182,10 +182,10 @@ export async function listProfiles(): Promise<Profile[]> {
   const userId = await getCurrentUserId()
   // Try to select avatarurl; if column doesn't exist, fall back to selecting without it
   let data, error
-  try {
-    ({ data, error } = await sb.from('profiles').select('id,name,createdat,avatarurl').eq('user_id', userId).order('name', { ascending: true }))
-  } catch {
-    ({ data, error } = await sb.from('profiles').select('id,name,createdat').eq('user_id', userId).order('name', { ascending: true }))
+  ;({ data, error } = await sb.from('profiles').select('id,name,createdat,avatarurl').eq('user_id', userId).order('name', { ascending: true }))
+  if (error && error.message?.includes('column profiles.avatarurl does not exist')) {
+    // Retry without avatarurl
+    ;({ data, error } = await sb.from('profiles').select('id,name,createdat').eq('user_id', userId).order('name', { ascending: true }))
   }
   if (error) throw error
   return (data ?? []).map((row: any) => ({
