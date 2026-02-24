@@ -43,6 +43,8 @@ import {
 
 type FilterMode = 'All' | 'Expiring' | 'Expired'
 
+type SortMode = 'Expiry' | 'Created' | 'Issuer'
+
 function newId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
@@ -85,6 +87,12 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<CardRecord[]>([])
   const [filter, setFilter] = useState<FilterMode>('All')
+  const [sortMode, setSortMode] = useState<SortMode>('Expiry')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [expiringWithinDays, setExpiringWithinDays] = useState<7 | 14 | 30 | null>(null)
+  const [filterKind, setFilterKind] = useState<string>('')
+  const [filterProfileId, setFilterProfileId] = useState<string>('')
+  const [filterProviderId, setFilterProviderId] = useState<string>('')
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [busy, setBusy] = useState(false)
   const [language, setLanguage] = useState<Language>('en')
@@ -338,56 +346,131 @@ export default function App() {
 
   const derived = useMemo(() => {
     const reminderDays = settings?.reminderDays ?? 30
-    const by = cards.map((c) => ({
-      card: c,
-      days: daysUntil(c.expiryDate),
-      expired: isExpired(c.expiryDate),
-      expiringSoon: daysUntil(c.expiryDate) <= reminderDays && !isExpired(c.expiryDate)
-    }))
 
-    const filtered = by.filter((x) => {
-      if (filter === 'All') return true
-      if (filter === 'Expired') return x.expired
-      if (filter === 'Expiring') return x.expiringSoon
-      return true
+    const providerById = new Map(providers.map((p) => [p.id, p]))
+    const profileById = new Map(profiles.map((p) => [p.id, p]))
+
+    const q = searchQuery.trim().toLowerCase()
+
+    const by = cards.map((card) => {
+      const days = daysUntil(card.expiryDate)
+      const expired = days < 0
+      const expiringSoon = days >= 0 && days <= reminderDays
+      const providerName = card.renewalProviderId ? providerById.get(card.renewalProviderId)?.name ?? '' : ''
+      const profileName = card.profileId ? profileById.get(card.profileId)?.name ?? '' : 'Personal'
+
+      return {
+        card,
+        days,
+        expired,
+        expiringSoon,
+        providerName,
+        profileName
+      }
     })
+
+    const filtered = by
+      .filter((x) => {
+        if (filter === 'All') return true
+        if (filter === 'Expired') return x.expired
+        if (filter === 'Expiring') return x.expiringSoon
+        return true
+      })
+      .filter((x) => {
+        if (!expiringWithinDays) return true
+        return x.days >= 0 && x.days <= expiringWithinDays
+      })
+      .filter((x) => {
+        if (!filterKind) return true
+        return x.card.kind === filterKind
+      })
+      .filter((x) => {
+        if (!filterProfileId) return true
+        return (x.card.profileId || 'personal') === filterProfileId
+      })
+      .filter((x) => {
+        if (!filterProviderId) return true
+        return (x.card.renewalProviderId || '') === filterProviderId
+      })
+      .filter((x) => {
+        if (!q) return true
+        const hay = [
+          x.card.title,
+          x.card.issuer ?? '',
+          x.card.notes ?? '',
+          x.card.kind,
+          x.providerName,
+          x.profileName
+        ]
+          .join(' ')
+          .toLowerCase()
+        return hay.includes(q)
+      })
 
     const expiringSoonCount = by.filter((x) => x.expiringSoon).length
     const expiredCount = by.filter((x) => x.expired).length
 
+    const compare = (a: (typeof filtered)[number], b: (typeof filtered)[number]) => {
+      if (sortMode === 'Created') {
+        return a.card.createdAt - b.card.createdAt
+      }
+      if (sortMode === 'Issuer') {
+        const ai = (a.card.issuer ?? '').toLowerCase()
+        const bi = (b.card.issuer ?? '').toLowerCase()
+        const cmp = ai.localeCompare(bi)
+        if (cmp !== 0) return cmp
+        return a.card.expiryDate.localeCompare(b.card.expiryDate)
+      }
+      return a.card.expiryDate.localeCompare(b.card.expiryDate)
+    }
+
     // Group cards by profile
-    const groupedByProfile = filtered.reduce((acc, item) => {
-      const profileId = item.card.profileId || 'personal'
-      let profile
-      
-      if (profileId === 'personal') {
-        profile = { id: 'personal', name: 'Personal', createdAt: 0 }
-      } else {
-        // Try to find profile by ID first
-        profile = profiles.find(p => p.id === profileId)
-        
-        // If not found by ID, the profile might have been deleted
-        // Move it to Personal instead of showing "Unknown Profile"
-        if (!profile) {
-          console.log(`Profile ${profileId} not found, moving to Personal`)
+    const groupedByProfile = filtered.reduce(
+      (acc, item) => {
+        const profileId = item.card.profileId || 'personal'
+        let profile
+
+        if (profileId === 'personal') {
           profile = { id: 'personal', name: 'Personal', createdAt: 0 }
+        } else {
+          profile = profiles.find((p) => p.id === profileId)
+          if (!profile) {
+            console.log(`Profile ${profileId} not found, moving to Personal`)
+            profile = { id: 'personal', name: 'Personal', createdAt: 0 }
+          }
         }
-      }
-      
-      if (!acc[profile.id]) {
-        acc[profile.id] = {
-          profile: profile,
-          cards: []
+
+        if (!acc[profile.id]) {
+          acc[profile.id] = {
+            profile,
+            cards: []
+          }
         }
-      }
-      acc[profile.id].cards.push(item)
-      return acc
-    }, {} as Record<string, { profile: Profile; cards: typeof filtered }>)
-    
-    const profileGroups = Object.values(groupedByProfile)
+        acc[profile.id].cards.push(item)
+        return acc
+      },
+      {} as Record<string, { profile: Profile; cards: typeof filtered }>
+    )
+
+    const profileGroups = Object.values(groupedByProfile).map((g) => ({
+      ...g,
+      cards: [...g.cards].sort(compare)
+    }))
 
     return { filtered, expiringSoonCount, expiredCount, profileGroups }
-  }, [cards, filter, settings, profiles])
+  }, [
+    cards,
+    filter,
+    settings,
+    profiles,
+    providers,
+    searchQuery,
+    expiringWithinDays,
+    filterKind,
+    filterProfileId,
+    filterProviderId,
+    sortMode
+  ])
 
   const viewingCard = useMemo(() => {
     if (!viewingId) return null
@@ -1016,6 +1099,16 @@ export default function App() {
     alert('No renewal URL available for this card.')
   }
 
+  function clearAllFilters() {
+    setFilter('All')
+    setSearchQuery('')
+    setExpiringWithinDays(null)
+    setFilterKind('')
+    setFilterProfileId('')
+    setFilterProviderId('')
+    setSortMode('Expiry')
+  }
+
   async function toggleNotifications(next: boolean) {
     if (!settings) return
 
@@ -1353,7 +1446,8 @@ export default function App() {
                   <div className="mt-1 text-2xl font-bold text-emerald-400">{cards.length}</div>
                 </div>
                 <svg className="h-8 w-8 text-emerald-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
             </div>
@@ -1410,10 +1504,10 @@ export default function App() {
         </section>
 
         {/* Filter and Cards */}
-        {cards.length > 0 && (
-          <section className="mb-8">
+        <section className="mb-8">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {(['All', 'Expiring', 'Expired'] as const).map((m) => (
                   <button
                     key={m}
@@ -1429,18 +1523,130 @@ export default function App() {
                 ))}
               </div>
 
-              <label className="flex items-center gap-3 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-950/20 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800">
+                <div>
+                  Showing <span className="font-semibold text-slate-100">{derived.filtered.length}</span> of{' '}
+                  <span className="font-semibold text-slate-100">{cards.length}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                >
+                  Clear filters
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="flex items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.25 5.25a7.5 7.5 0 0011.4 11.4z"
+                  />
+                </svg>
                 <input
-                  type="checkbox"
-                  checked={settings?.notificationsEnabled ?? false}
-                  onChange={(e) => toggleNotifications(e.target.checked)}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search title, issuer, notes, provider…"
+                  className="w-full bg-transparent text-slate-200 placeholder:text-slate-500 focus:outline-none"
                 />
-                <span className="text-slate-200">{t.notifications}</span>
-                <span className="text-xs text-slate-400">(when supported)</span>
               </label>
+
+                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                  <span className="text-slate-300">Expiring in:</span>
+                  {([7, 14, 30] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setExpiringWithinDays(expiringWithinDays === d ? null : d)}
+                      className={`rounded-lg px-2 py-1 text-xs ring-1 ${
+                        expiringWithinDays === d
+                          ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/30'
+                          : 'bg-slate-800/50 text-slate-300 ring-slate-700 hover:bg-slate-800'
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                  {expiringWithinDays ? (
+                    <button
+                      type="button"
+                      onClick={() => setExpiringWithinDays(null)}
+                      className="ml-auto text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+
+                <label className="flex items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                  <span className="text-slate-300">Sort:</span>
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                    className="ml-auto w-full bg-transparent text-slate-200 focus:outline-none"
+                  >
+                    <option value="Expiry">Expiry date</option>
+                    <option value="Created">Created</option>
+                    <option value="Issuer">Issuer</option>
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                  <span className="text-slate-300">Kind:</span>
+                  <select
+                    value={filterKind}
+                    onChange={(e) => setFilterKind(e.target.value)}
+                    className="ml-auto w-full bg-transparent text-slate-200 focus:outline-none"
+                  >
+                    <option value="">All</option>
+                    {cardKinds.map((k) => (
+                      <option key={k} value={k}>
+                        {k}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                  <span className="text-slate-300">Profile:</span>
+                  <select
+                    value={filterProfileId}
+                    onChange={(e) => setFilterProfileId(e.target.value)}
+                    className="ml-auto w-full bg-transparent text-slate-200 focus:outline-none"
+                  >
+                    <option value="">All</option>
+                    <option value="personal">Personal</option>
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                  <span className="text-slate-300">Provider:</span>
+                  <select
+                    value={filterProviderId}
+                    onChange={(e) => setFilterProviderId(e.target.value)}
+                    className="ml-auto w-full bg-transparent text-slate-200 focus:outline-none"
+                  >
+                    <option value="">All</option>
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
           </section>
-        )}
 
         <section className="mt-6">
           {derived.filtered.length === 0 ? (
