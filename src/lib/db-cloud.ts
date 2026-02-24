@@ -180,18 +180,13 @@ export async function deleteCard(id: string): Promise<void> {
 export async function listProfiles(): Promise<Profile[]> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  // Try to select avatarurl; if column doesn't exist, fall back to selecting without it
-  let data, error
-  ;({ data, error } = await sb.from('profiles').select('id,name,createdat,avatarurl').eq('user_id', userId).order('name', { ascending: true }))
-  if (error && error.message?.includes('column profiles.avatarurl does not exist')) {
-    // Retry without avatarurl
-    ;({ data, error } = await sb.from('profiles').select('id,name,createdat').eq('user_id', userId).order('name', { ascending: true }))
-  }
+  // Do not request avatarurl from cloud; always fall back to local-only avatars
+  const { data, error } = await sb.from('profiles').select('id,name,createdat').eq('user_id', userId).order('name', { ascending: true })
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     id: row.id,
     name: row.name,
-    avatarUrl: row.avatarurl ?? undefined,
+    avatarUrl: undefined, // Cloud profiles do not have avatars until schema is updated
     createdAt: row.createdat
   })) as Profile[]
 }
@@ -217,29 +212,12 @@ export async function createProfile(name: string): Promise<Profile> {
 export async function updateProfile(input: { id: string; name: string; avatarUrl?: string | null }): Promise<void> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  // Try to update including avatarUrl; if column doesn't exist, fall back to name-only update
-  const updatePayload: any = { name: input.name.trim() }
-  // Only include avatarurl if we think the column might exist (optional)
-  const { error: colCheckError } = await sb.from('profiles').select('avatarurl').limit(1)
-  if (!colCheckError) {
-    updatePayload.avatarurl = input.avatarUrl
-  }
-  let error = null
-  try {
-    ({ error } = await sb
-      .from('profiles')
-      .update(updatePayload)
-      .eq('id', input.id)
-      .eq('user_id', userId))
-  } catch {
-    // If update with avatarurl fails, try without it
-    delete updatePayload.avatarurl
-    ({ error } = await sb
-      .from('profiles')
-      .update(updatePayload)
-      .eq('id', input.id)
-      .eq('user_id', userId))
-  }
+  // Never attempt to update avatarurl in cloud until column exists
+  const { error } = await sb
+    .from('profiles')
+    .update({ name: input.name.trim() })
+    .eq('id', input.id)
+    .eq('user_id', userId)
   if (error) throw error
 }
 
