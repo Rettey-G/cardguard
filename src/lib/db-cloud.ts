@@ -225,8 +225,28 @@ export async function saveProfileAvatar(profileId: string, file: File): Promise<
   const sb = requireClient()
   const ext = file.name.split('.').pop() ?? 'jpg'
   const path = `${profileId}/avatar.${ext}`
+  // Try to ensure bucket exists (may fail if permissions don't allow)
+  try {
+    const { error: bucketError } = await sb.storage.createBucket(AVATAR_BUCKET, { public: true })
+    // Ignore "already exists" errors
+    if (bucketError && !bucketError.message?.includes('already exists')) {
+      console.warn('Could not create avatar bucket:', bucketError.message)
+    }
+  } catch {
+    // ignore
+  }
   const { error } = await sb.storage.from(AVATAR_BUCKET).upload(path, file, { upsert: true, contentType: file.type })
-  if (error) throw error
+  if (error) {
+    // If bucket not found or permissions denied, fall back to returning a data URL for local storage
+    if (error.message?.includes('Bucket not found') || error.message?.includes('permission')) {
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+    }
+    throw error
+  }
   const { data: { publicUrl } } = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path)
   return publicUrl
 }
