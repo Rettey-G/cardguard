@@ -37,6 +37,8 @@ import {
   listProfiles,
   listRenewalProviders,
   resetDatabase,
+  saveProfileAvatar,
+  deleteProfileAvatar,
   saveSettings,
   upsertCard
 } from './lib/db-unified'
