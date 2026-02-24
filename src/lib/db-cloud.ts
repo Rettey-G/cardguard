@@ -180,12 +180,12 @@ export async function deleteCard(id: string): Promise<void> {
 export async function listProfiles(): Promise<Profile[]> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  const { data, error } = await sb.from('profiles').select('*').eq('user_id', userId).order('name', { ascending: true })
+  const { data, error } = await sb.from('profiles').select('id,name,createdat,avatarurl').eq('user_id', userId).order('name', { ascending: true })
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     id: row.id,
     name: row.name,
-    avatarUrl: row.avatarurl,
+    avatarUrl: row.avatarurl ?? undefined,
     createdAt: row.createdat
   })) as Profile[]
 }
@@ -196,7 +196,6 @@ export async function createProfile(name: string): Promise<Profile> {
   const profile = {
     id: crypto.randomUUID(),
     name: name.trim(),
-    avatarurl: null,
     createdat: Date.now(),
     user_id: userId
   }
@@ -205,7 +204,6 @@ export async function createProfile(name: string): Promise<Profile> {
   return {
     id: profile.id,
     name: profile.name,
-    avatarUrl: profile.avatarurl,
     createdAt: profile.createdat
   }
 }
@@ -213,11 +211,29 @@ export async function createProfile(name: string): Promise<Profile> {
 export async function updateProfile(input: { id: string; name: string; avatarUrl?: string | null }): Promise<void> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  const { error } = await sb
-    .from('profiles')
-    .update({ name: input.name.trim(), avatarurl: input.avatarUrl })
-    .eq('id', input.id)
-    .eq('user_id', userId)
+  // Try to update including avatarUrl; if column doesn't exist, fall back to name-only update
+  const updatePayload: any = { name: input.name.trim() }
+  // Only include avatarurl if we think the column might exist (optional)
+  const { error: colCheckError } = await sb.from('profiles').select('avatarurl').limit(1)
+  if (!colCheckError) {
+    updatePayload.avatarurl = input.avatarUrl
+  }
+  let error = null
+  try {
+    ({ error } = await sb
+      .from('profiles')
+      .update(updatePayload)
+      .eq('id', input.id)
+      .eq('user_id', userId))
+  } catch {
+    // If update with avatarurl fails, try without it
+    delete updatePayload.avatarurl
+    ({ error } = await sb
+      .from('profiles')
+      .update(updatePayload)
+      .eq('id', input.id)
+      .eq('user_id', userId))
+  }
   if (error) throw error
 }
 
