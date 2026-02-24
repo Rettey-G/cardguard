@@ -22,3 +22,8 @@ export const listCardKinds = impl.listCardKinds
 export const createCardKind = impl.createCardKind
 export const deleteCardKind = impl.deleteCardKind
 export const getDb = (local as any).getDb
+
+// Avatar helpers
+export const saveProfileAvatar = impl.saveProfileAvatar
+export const getProfileAvatar = impl.getProfileAvatar
+export const deleteProfileAvatar = impl.deleteProfileAvatar

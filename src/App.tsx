@@ -1523,20 +1523,57 @@ export default function App() {
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-950/20 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800">
-                <div>
-                  Showing <span className="font-semibold text-slate-100">{derived.filtered.length}</span> of{' '}
-                  <span className="font-semibold text-slate-100">{cards.length}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
-                >
-                  Clear filters
-                </button>
-              </div>
+              <label className="flex items-center gap-3 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
+                <input
+                  type="checkbox"
+                  checked={settings?.notificationsEnabled ?? false}
+                  onChange={(e) => toggleNotifications(e.target.checked)}
+                />
+                <span className="text-slate-200">{t.notifications}</span>
+                <span className="text-xs text-slate-400">(when supported)</span>
+              </label>
             </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-950/20 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800">
+              <div>
+                Showing <span className="font-semibold text-slate-100">{derived.filtered.length}</span> of{' '}
+                <span className="font-semibold text-slate-100">{cards.length}</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+              >
+                Clear filters
+              </button>
+            </div>
+
+            {/* Reset local data button if cards failed to load */}
+            {cards.length === 0 && (
+              <div className="rounded-xl bg-red-500/10 p-3 text-xs ring-1 ring-red-500/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-red-300">Cards failed to load. Local storage may be corrupted.</span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      const ok = confirm(
+                        'Reset local CardGuard storage? This will delete all cards, images, profiles, and custom types on this device.'
+                      )
+                      if (!ok) return
+                      setBusy(true)
+                      resetDatabase().finally(() => {
+                        setBusy(false)
+                        window.location.reload()
+                      })
+                    }}
+                    className="rounded-lg bg-red-500/20 px-3 py-1 text-xs text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/30 disabled:opacity-60"
+                  >
+                    Reset local data
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="flex items-center gap-2 rounded-xl bg-slate-950/30 px-3 py-2 text-sm ring-1 ring-slate-800">
@@ -1656,7 +1693,17 @@ export default function App() {
               {derived.profileGroups.map(({ profile, cards }) => (
                 <div key={profile.id}>
                   <div className="mb-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="h-10 w-10 rounded-full bg-slate-800 ring-2 ring-slate-700 overflow-hidden flex-shrink-0">
+                        {profile.avatarUrl ? (
+                          <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-sm font-semibold text-slate-300">
+                            {profile.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
                       <h3 className="text-lg font-semibold text-slate-100">
                         {profile.name}
                       </h3>
@@ -2493,19 +2540,72 @@ export default function App() {
                           key={p.id}
                           className="flex items-center justify-between gap-3 rounded-xl bg-slate-950/40 px-3 py-2 ring-1 ring-slate-800"
                         >
-                          <div className="text-sm text-slate-200">{p.name}</div>
+                          <div className="flex items-center gap-3">
+                            {/* Avatar preview */}
+                            <div className="h-8 w-8 rounded-full bg-slate-800 ring-1 ring-slate-700 overflow-hidden flex-shrink-0">
+                              {p.avatarUrl ? (
+                                <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center text-xs font-semibold text-slate-400">
+                                  {p.name.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-sm text-slate-200">{p.name}</span>
+                          </div>
                           <div className="flex items-center gap-2">
+                            <label className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0]
+                                  if (!file) return
+                                  try {
+                                    const url = await saveProfileAvatar(p.id, file)
+                                    await updateProfile({ id: p.id, name: p.name, avatarUrl: url })
+                                    await refresh()
+                                  } catch (err) {
+                                    console.error('Failed to upload avatar:', err)
+                                    alert('Failed to upload avatar')
+                                  }
+                                  e.target.value = ''
+                                }}
+                              />
+                              Photo
+                            </label>
+                            {p.avatarUrl && (
+                              <button
+                                disabled={busy}
+                                onClick={async () => {
+                                  if (!confirm('Remove profile picture?')) return
+                                  try {
+                                    await deleteProfileAvatar(p.id)
+                                    await updateProfile({ id: p.id, name: p.name, avatarUrl: null })
+                                    await refresh()
+                                  } catch (err) {
+                                    console.error('Failed to remove avatar:', err)
+                                    alert('Failed to remove avatar')
+                                  }
+                                }}
+                                className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-300 ring-1 ring-red-500/30 hover:bg-red-500/30 disabled:opacity-60"
+                                title="Remove picture"
+                              >
+                                ✕
+                              </button>
+                            )}
                             <button
                               disabled={busy}
                               onClick={() => onRenameProfile()}
-                              className="rounded-lg bg-slate-900 px-3 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
+                              className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
                             >
                               Rename
                             </button>
                             <button
                               disabled={busy}
                               onClick={() => onDeleteProfile(p.id, p.name)}
-                              className="rounded-lg bg-red-500/10 px-3 py-1 text-xs text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/15 disabled:opacity-60"
+                              className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-300 ring-1 ring-red-500/30 hover:bg-red-500/30 disabled:opacity-60"
                             >
                               Delete
                             </button>

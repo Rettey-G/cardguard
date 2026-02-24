@@ -2,6 +2,7 @@ import type { AppSettings, CardAttachment, CardRecord, CardWithImage, Profile, R
 import { supabase } from './supabase'
 
 const IMAGE_BUCKET = 'card-images'
+const AVATAR_BUCKET = 'profile-avatars'
 
 function requireClient() {
   if (!supabase) throw new Error('Supabase is not configured')
@@ -182,7 +183,9 @@ export async function listProfiles(): Promise<Profile[]> {
   const { data, error } = await sb.from('profiles').select('*').eq('user_id', userId).order('name', { ascending: true })
   if (error) throw error
   return (data ?? []).map((row: any) => ({
-    ...row,
+    id: row.id,
+    name: row.name,
+    avatarUrl: row.avatarurl,
     createdAt: row.createdat
   })) as Profile[]
 }
@@ -193,6 +196,7 @@ export async function createProfile(name: string): Promise<Profile> {
   const profile = {
     id: crypto.randomUUID(),
     name: name.trim(),
+    avatarurl: null,
     createdat: Date.now(),
     user_id: userId
   }
@@ -201,19 +205,47 @@ export async function createProfile(name: string): Promise<Profile> {
   return {
     id: profile.id,
     name: profile.name,
+    avatarUrl: profile.avatarurl,
     createdAt: profile.createdat
   }
 }
 
-export async function updateProfile(input: { id: string; name: string }): Promise<void> {
+export async function updateProfile(input: { id: string; name: string; avatarUrl?: string | null }): Promise<void> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
   const { error } = await sb
     .from('profiles')
-    .update({ name: input.name.trim() })
+    .update({ name: input.name.trim(), avatarurl: input.avatarUrl })
     .eq('id', input.id)
     .eq('user_id', userId)
   if (error) throw error
+}
+
+export async function saveProfileAvatar(profileId: string, file: File): Promise<string> {
+  const sb = requireClient()
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${profileId}/avatar.${ext}`
+  const { error } = await sb.storage.from(AVATAR_BUCKET).upload(path, file, { upsert: true, contentType: file.type })
+  if (error) throw error
+  const { data: { publicUrl } } = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path)
+  return publicUrl
+}
+
+export async function getProfileAvatar(profileId: string): Promise<string | null> {
+  const sb = requireClient()
+  const { data } = await sb.storage.from(AVATAR_BUCKET).list(profileId, { limit: 1 })
+  if (!data?.length) return null
+  const { data: { publicUrl } } = sb.storage.from(AVATAR_BUCKET).getPublicUrl(`${profileId}/${data[0].name}`)
+  return publicUrl
+}
+
+export async function deleteProfileAvatar(profileId: string): Promise<void> {
+  const sb = requireClient()
+  const { data } = await sb.storage.from(AVATAR_BUCKET).list(profileId, { limit: 100 })
+  if (data?.length) {
+    const paths = data.map((f) => `${profileId}/${f.name}`)
+    await sb.storage.from(AVATAR_BUCKET).remove(paths)
+  }
 }
 
 export async function deleteProfile(id: string): Promise<void> {
@@ -221,6 +253,8 @@ export async function deleteProfile(id: string): Promise<void> {
   const userId = await getCurrentUserId()
   const { error } = await sb.from('profiles').delete().eq('id', id).eq('user_id', userId)
   if (error) throw error
+  // Also delete avatar files
+  await deleteProfileAvatar(id)
 }
 
 export async function listRenewalProviders(): Promise<RenewalProvider[]> {

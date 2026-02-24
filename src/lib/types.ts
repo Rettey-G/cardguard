@@ -3,6 +3,7 @@ export type CardKind = string
 export type Profile = {
   id: string
   name: string
+  avatarUrl?: string // URL to profile picture (local or cloud)
   createdAt: number
 }
 

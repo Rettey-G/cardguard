@@ -58,7 +58,9 @@ interface CardGuardDb extends DBSchema {
 }
 
 const DB_NAME = 'cardguard-db'
-const DB_VERSION = 4
+const DB_VERSION = 6
+const IMAGE_BUCKET = 'card-images'
+const AVATAR_BUCKET = 'profile-avatars'
 
 const DEFAULT_KINDS: string[] = [
   'Passport',
@@ -250,9 +252,50 @@ export async function updateProfile(input: { id: string; name: string }): Promis
   await db.put('profiles', { ...existing, name: input.name.trim() })
 }
 
+export async function saveProfile(profile: Profile): Promise<void> {
+  const db = await getDb()
+  await db.put('profiles', profile)
+}
+
 export async function deleteProfile(id: string): Promise<void> {
   const db = await getDb()
   await db.delete('profiles', id)
+  // Optional: delete avatar file from local storage
+  try {
+    await deleteDB(AVATAR_BUCKET)
+  } catch {
+    // ignore if avatar bucket doesn't exist
+  }
+}
+
+export async function saveProfileAvatar(profileId: string, file: File): Promise<string> {
+  // Store avatar in IndexedDB as a blob and return a local URL
+  const db = await getDb()
+  if (!db.objectStoreNames.contains(AVATAR_BUCKET)) {
+    db.createObjectStore(AVATAR_BUCKET)
+  }
+  const tx = db.transaction(AVATAR_BUCKET, 'readwrite')
+  const store = tx.objectStore(AVATAR_BUCKET)
+  await store.put(file, profileId)
+  await tx.done
+  // Return a blob URL for immediate use
+  return URL.createObjectURL(file)
+}
+
+export async function getProfileAvatar(profileId: string): Promise<string | null> {
+  const db = await getDb()
+  if (!db.objectStoreNames.contains(AVATAR_BUCKET)) return null
+  const file = await db.get(AVATAR_BUCKET, profileId)
+  if (!file) return null
+  return URL.createObjectURL(file as File)
+}
+
+export async function deleteProfileAvatar(profileId: string): Promise<void> {
+  const db = await getDb()
+  if (!db.objectStoreNames.contains(AVATAR_BUCKET)) return
+  const tx = db.transaction(AVATAR_BUCKET, 'readwrite')
+  await tx.objectStore(AVATAR_BUCKET).delete(profileId)
+  await tx.done
 }
 
 export async function listRenewalProviders(): Promise<RenewalProvider[]> {
