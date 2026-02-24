@@ -180,7 +180,13 @@ export async function deleteCard(id: string): Promise<void> {
 export async function listProfiles(): Promise<Profile[]> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  const { data, error } = await sb.from('profiles').select('id,name,createdat,avatarurl').eq('user_id', userId).order('name', { ascending: true })
+  // Try to select avatarurl; if column doesn't exist, fall back to selecting without it
+  let data, error
+  try {
+    ({ data, error } = await sb.from('profiles').select('id,name,createdat,avatarurl').eq('user_id', userId).order('name', { ascending: true }))
+  } catch {
+    ({ data, error } = await sb.from('profiles').select('id,name,createdat').eq('user_id', userId).order('name', { ascending: true }))
+  }
   if (error) throw error
   return (data ?? []).map((row: any) => ({
     id: row.id,
