@@ -22,7 +22,7 @@ export async function resetDatabase(): Promise<void> {
 export async function getSettings(): Promise<AppSettings> {
   const sb = requireClient()
   const userId = await getCurrentUserId()
-  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled,defaultreminderdays').eq('user_id', userId).maybeSingle()
+  const { data, error } = await sb.from('settings').select('reminderdays,notificationsenabled').eq('user_id', userId).maybeSingle()
   if (error) throw error
   if (!data) {
     return {
@@ -34,7 +34,7 @@ export async function getSettings(): Promise<AppSettings> {
   return {
     reminderDays: (data as any).reminderdays,
     notificationsEnabled: (data as any).notificationsenabled,
-    defaultReminderDays: (data as any).defaultreminderdays || [30, 14, 7, 1]
+    defaultReminderDays: [30, 14, 7, 1] // fallback since column doesn't exist yet
   }
 }
 
@@ -46,8 +46,8 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
     .upsert({ 
       key: 'app', 
       reminderdays: settings.reminderDays, 
-      notificationsenabled: settings.notificationsEnabled, 
-      defaultreminderdays: settings.defaultReminderDays,
+      notificationsenabled: settings.notificationsEnabled,
+      // omit defaultreminderdays until column is added
       user_id: userId 
     })
   if (error) throw error
