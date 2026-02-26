@@ -19,6 +19,7 @@ import {
   verifyPin,
   type LockConfig
 } from './lib/security'
+import { authenticateBiometric, isBiometricSupported, registerBiometricCredential } from './lib/webauthn'
 import { createGoogleCalendarUrl, createAppleCalendarUrl, downloadICSFile } from './lib/calendar'
 import {
   createCardKind,
@@ -294,6 +295,29 @@ export default function App() {
     }
   }
 
+  async function onUnlockBiometric() {
+    if (!lockConfig.enabled) return
+    if (!lockConfig.biometricEnabled || !lockConfig.biometricCredentialIdB64) {
+      setUnlockError('Fingerprint not configured')
+      return
+    }
+    try {
+      const ok = await authenticateBiometric(lockConfig.biometricCredentialIdB64)
+      if (!ok) {
+        setUnlockError('Fingerprint unlock failed')
+        return
+      }
+      setLocked(false)
+      setUnlockPin('')
+      setUnlockError(null)
+      // Notes remain locked until PIN unlock (notesKey stays null)
+      await refresh()
+      await refreshMeta()
+    } catch (e) {
+      setUnlockError(e instanceof Error ? e.message : 'Fingerprint unlock failed')
+    }
+  }
+
   async function enableLockWithNewPin() {
     if (newPin.length !== 6 || newPin2.length !== 6) {
       setUnlockError('PIN must be 6 digits')
@@ -305,7 +329,13 @@ export default function App() {
     }
 
     const { pinSaltB64, pinVerifierB64 } = await createPinVerifier(newPin)
-    const cfg: LockConfig = { enabled: true, pinSaltB64, pinVerifierB64 }
+    const cfg: LockConfig = {
+      enabled: true,
+      pinSaltB64,
+      pinVerifierB64,
+      biometricEnabled: lockConfig.biometricEnabled ?? false,
+      biometricCredentialIdB64: lockConfig.biometricCredentialIdB64 ?? null
+    }
     saveLockConfig(cfg)
     setLockConfig(cfg)
     setNotesKey(null)
@@ -319,7 +349,13 @@ export default function App() {
   }
 
   function disableLock() {
-    const cfg: LockConfig = { enabled: false, pinSaltB64: null, pinVerifierB64: null }
+    const cfg: LockConfig = {
+      enabled: false,
+      pinSaltB64: null,
+      pinVerifierB64: null,
+      biometricEnabled: false,
+      biometricCredentialIdB64: null
+    }
     saveLockConfig(cfg)
     setLockConfig(cfg)
     setLocked(false)
@@ -1256,6 +1292,16 @@ export default function App() {
                   {unlockError}
                 </div>
               ) : null}
+
+              {isBiometricSupported() && lockConfig.biometricEnabled && lockConfig.biometricCredentialIdB64 ? (
+                <button
+                  type="button"
+                  onClick={onUnlockBiometric}
+                  className="mt-4 w-full rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-100 ring-1 ring-slate-700 hover:bg-slate-800"
+                >
+                  Use Fingerprint / FaceID
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -1289,6 +1335,67 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            {lockConfig.enabled ? (
+              <div className="mt-4 grid gap-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/40 px-3 py-2 ring-1 ring-slate-800">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-100">Fingerprint / FaceID</div>
+                    <div className="text-xs text-slate-400">Unlock the app using your device biometrics (when supported).</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {lockConfig.biometricEnabled && lockConfig.biometricCredentialIdB64 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cfg: LockConfig = {
+                            ...lockConfig,
+                            biometricEnabled: false,
+                            biometricCredentialIdB64: null
+                          }
+                          saveLockConfig(cfg)
+                          setLockConfig(cfg)
+                        }}
+                        className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                      >
+                        Disable
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!isBiometricSupported() || busy}
+                        onClick={async () => {
+                          try {
+                            if (!isBiometricSupported()) {
+                              alert('Biometric unlock is not supported on this device/browser.')
+                              return
+                            }
+                            setBusy(true)
+                            const credIdB64 = await registerBiometricCredential('CardGuard', user?.id ?? 'user')
+                            const cfg: LockConfig = {
+                              ...lockConfig,
+                              biometricEnabled: true,
+                              biometricCredentialIdB64: credIdB64
+                            }
+                            saveLockConfig(cfg)
+                            setLockConfig(cfg)
+                            alert('Fingerprint / FaceID enabled')
+                          } catch (e) {
+                            console.error('Biometric setup failed:', e)
+                            alert(e instanceof Error ? e.message : 'Biometric setup failed')
+                          } finally {
+                            setBusy(false)
+                          }
+                        }}
+                        className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15 disabled:opacity-60"
+                      >
+                        Enable
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {pinSetupOpen ? (
               <div className="mt-4 grid gap-2">
