@@ -105,6 +105,7 @@ export default function App() {
   const [unlockPin, setUnlockPin] = useState('')
   const [unlockError, setUnlockError] = useState<string | null>(null)
   const [notesKey, setNotesKey] = useState<CryptoKey | null>(null)
+  const [lockTypeSelectionOpen, setLockTypeSelectionOpen] = useState(false)
   const [pinSetupOpen, setPinSetupOpen] = useState(false)
   const [newPin, setNewPin] = useState('')
   const [newPin2, setNewPin2] = useState('')
@@ -310,7 +311,8 @@ export default function App() {
       setLocked(false)
       setUnlockPin('')
       setUnlockError(null)
-      // Notes remain locked until PIN unlock (notesKey stays null)
+      // For biometric-only unlock, notes remain encrypted (no notesKey)
+      // User needs PIN to view encrypted notes
       await refresh()
       await refreshMeta()
     } catch (e) {
@@ -331,6 +333,7 @@ export default function App() {
     const { pinSaltB64, pinVerifierB64 } = await createPinVerifier(newPin)
     const cfg: LockConfig = {
       enabled: true,
+      lockType: 'pin',
       pinSaltB64,
       pinVerifierB64,
       biometricEnabled: lockConfig.biometricEnabled ?? false,
@@ -351,6 +354,7 @@ export default function App() {
   function disableLock() {
     const cfg: LockConfig = {
       enabled: false,
+      lockType: null,
       pinSaltB64: null,
       pinVerifierB64: null,
       biometricEnabled: false,
@@ -392,9 +396,9 @@ export default function App() {
 
     const by = cards.map((card) => {
       const hasExpiry = !!card.expiryDate
-      const days = hasExpiry ? daysUntil(card.expiryDate) : Number.POSITIVE_INFINITY
-      const expired = hasExpiry ? days < 0 : false
-      const expiringSoon = hasExpiry ? days >= 0 && days <= reminderDays : false
+      const days = hasExpiry && card.expiryDate ? daysUntil(card.expiryDate) : Number.POSITIVE_INFINITY
+      const expired = hasExpiry && card.expiryDate ? days < 0 : false
+      const expiringSoon = hasExpiry && card.expiryDate ? days >= 0 && days <= reminderDays : false
       const providerName = card.renewalProviderId ? providerById.get(card.renewalProviderId)?.name ?? '' : ''
       const profileName = card.profileId ? profileById.get(card.profileId)?.name ?? '' : 'Personal'
 
@@ -533,6 +537,7 @@ export default function App() {
     if (expiring.length === 0) return
 
     const soonest = expiring[0]
+    if (!soonest.expiryDate) return
     const d = daysUntil(soonest.expiryDate)
 
     // Show at most once per day (very lightweight local throttle).
@@ -1211,114 +1216,159 @@ export default function App() {
                   <img src={LOGO_SRC} alt="CardGuard" className="h-full w-full object-contain" />
                 </div>
                 <h2 className="text-xl font-bold text-slate-100">CardGuard</h2>
-                <p className="mt-1 text-sm text-slate-400">Enter your PIN to continue</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {lockConfig.lockType === 'biometric' ? 'Unlock to continue' : 'Enter your PIN to continue'}
+                </p>
               </div>
 
-              {/* PIN Dots Display */}
-              <div className="mb-6 flex justify-center gap-2">
-                {[0, 1, 2, 3, 4, 5].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-3 w-3 rounded-full transition-all duration-200 ${
-                      i < unlockPin.length
-                        ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40'
-                        : 'bg-slate-700'
-                    }`}
-                  />
-                ))}
-              </div>
-
-              {/* Hidden numeric input */}
-              <input
-                value={unlockPin}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, '').slice(0, 6)
-                  setUnlockPin(v)
-                  setUnlockError(null)
-                  if (v.length === 6) {
-                    setTimeout(() => onUnlock(), 100)
-                  }
-                }}
-                inputMode="numeric"
-                type="password"
-                maxLength={6}
-                className="sr-only"
-                autoFocus
-              />
-
-              {/* Keypad */}
-              <div className="grid grid-cols-3 gap-3">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+              {lockConfig.lockType === 'biometric' && isBiometricSupported() ? (
+                // Biometric Lock Screen
+                <div className="grid gap-4">
+                  <div className="flex justify-center mb-4">
+                    <div className="h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center">
+                      <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </div>
+                  </div>
                   <button
-                    key={num}
+                    type="button"
+                    onClick={onUnlockBiometric}
+                    className="w-full rounded-2xl bg-emerald-500 py-4 text-lg font-semibold text-slate-950 shadow-lg transition-all hover:bg-emerald-400 active:scale-95"
+                  >
+                    Use Fingerprint / FaceID
+                  </button>
+                  <div className="text-center">
+                    <span className="text-xs text-slate-500">or</span>
+                  </div>
+                  <button
                     type="button"
                     onClick={() => {
-                      if (unlockPin.length < 6) {
-                        const newPin = unlockPin + num
-                        setUnlockPin(newPin)
-                        setUnlockError(null)
-                        if (newPin.length === 6) {
-                          setTimeout(() => onUnlock(), 100)
-                        }
-                      }
+                      // Switch to PIN as fallback - user must enter PIN
+                      setUnlockPin('')
                     }}
-                    className="rounded-2xl bg-slate-800 py-4 text-lg font-semibold text-slate-100 shadow-inner transition-all hover:bg-slate-700 active:scale-95 active:bg-slate-600"
+                    className="w-full rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-100 ring-1 ring-slate-700 hover:bg-slate-800"
                   >
-                    {num}
+                    Use PIN instead
                   </button>
-                ))}
-                <button
-                  type="button"
-                  disabled={unlockPin.length === 0}
-                  onClick={() => {
-                    setUnlockPin(unlockPin.slice(0, -1))
-                    setUnlockError(null)
-                  }}
-                  className="rounded-2xl bg-slate-800/40 py-4 text-sm font-medium text-slate-400 shadow-inner transition-all hover:bg-slate-700/40 active:scale-95 disabled:opacity-30"
-                >
-                  ⌫
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (unlockPin.length < 6) {
-                      const newPin = unlockPin + '0'
-                      setUnlockPin(newPin)
+                  {/* Hidden PIN input for fallback */}
+                  <input
+                    value={unlockPin}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 6)
+                      setUnlockPin(v)
                       setUnlockError(null)
-                      if (newPin.length === 6) {
+                      if (v.length === 6) {
                         setTimeout(() => onUnlock(), 100)
                       }
-                    }
-                  }}
-                  className="rounded-2xl bg-slate-800 py-4 text-lg font-semibold text-slate-100 shadow-inner transition-all hover:bg-slate-700 active:scale-95 active:bg-slate-600"
-                >
-                  0
-                </button>
-                <button
-                  type="button"
-                  onClick={onUnlock}
-                  disabled={unlockPin.length === 0}
-                  className="rounded-2xl bg-emerald-500/10 py-4 text-sm font-medium text-emerald-400 shadow-inner transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-30"
-                >
-                  ✓
-                </button>
-              </div>
+                    }}
+                    inputMode="numeric"
+                    type="password"
+                    maxLength={6}
+                    placeholder="Enter PIN"
+                    className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm text-center ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              ) : (
+                // PIN Lock Screen
+                <>
+                  {/* PIN Dots Display */}
+                  <div className="mb-6 flex justify-center gap-2">
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-3 w-3 rounded-full transition-all duration-200 ${
+                          i < unlockPin.length
+                            ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40'
+                            : 'bg-slate-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Hidden numeric input */}
+                  <input
+                    value={unlockPin}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 6)
+                      setUnlockPin(v)
+                      setUnlockError(null)
+                      if (v.length === 6) {
+                        setTimeout(() => onUnlock(), 100)
+                      }
+                    }}
+                    inputMode="numeric"
+                    type="password"
+                    maxLength={6}
+                    className="sr-only"
+                    autoFocus
+                  />
+
+                  {/* Keypad */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => {
+                          if (unlockPin.length < 6) {
+                            const newPin = unlockPin + num
+                            setUnlockPin(newPin)
+                            setUnlockError(null)
+                            if (newPin.length === 6) {
+                              setTimeout(() => onUnlock(), 100)
+                            }
+                          }
+                        }}
+                        className="rounded-2xl bg-slate-800 py-4 text-lg font-semibold text-slate-100 shadow-inner transition-all hover:bg-slate-700 active:scale-95 active:bg-slate-600"
+                      >
+                        {num}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={unlockPin.length === 0}
+                      onClick={() => {
+                        setUnlockPin(unlockPin.slice(0, -1))
+                        setUnlockError(null)
+                      }}
+                      className="rounded-2xl bg-slate-800/40 py-4 text-sm font-medium text-slate-400 shadow-inner transition-all hover:bg-slate-700/40 active:scale-95 disabled:opacity-30"
+                    >
+                      ⌫
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (unlockPin.length < 6) {
+                          const newPin = unlockPin + '0'
+                          setUnlockPin(newPin)
+                          setUnlockError(null)
+                          if (newPin.length === 6) {
+                            setTimeout(() => onUnlock(), 100)
+                          }
+                        }
+                      }}
+                      className="rounded-2xl bg-slate-800 py-4 text-lg font-semibold text-slate-100 shadow-inner transition-all hover:bg-slate-700 active:scale-95 active:bg-slate-600"
+                    >
+                      0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onUnlock}
+                      disabled={unlockPin.length === 0}
+                      className="rounded-2xl bg-emerald-500/10 py-4 text-sm font-medium text-emerald-400 shadow-inner transition-all hover:bg-emerald-500/20 active:scale-95 disabled:opacity-30"
+                    >
+                      ✓
+                    </button>
+                  </div>
+                </>
+              )}
 
               {/* Error Message */}
               {unlockError ? (
                 <div className="mt-4 text-center text-sm text-red-400 animate-pulse">
                   {unlockError}
                 </div>
-              ) : null}
-
-              {isBiometricSupported() && lockConfig.biometricEnabled && lockConfig.biometricCredentialIdB64 ? (
-                <button
-                  type="button"
-                  onClick={onUnlockBiometric}
-                  className="mt-4 w-full rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-100 ring-1 ring-slate-700 hover:bg-slate-800"
-                >
-                  Use Fingerprint / FaceID
-                </button>
               ) : null}
             </div>
           </div>
@@ -1330,7 +1380,11 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-semibold text-slate-100">App Lock</div>
-                <div className="text-xs text-slate-400">Locks the app when you background it. Uses a 6-digit PIN.</div>
+                <div className="text-xs text-slate-400">
+                  {lockConfig.enabled 
+                    ? `Active: ${lockConfig.lockType === 'biometric' ? 'Fingerprint / FaceID' : '6-digit PIN'}`
+                    : 'Choose how to lock the app when you background it.'}
+                </div>
               </div>
               {lockConfig.enabled ? (
                 <button
@@ -1338,80 +1392,102 @@ export default function App() {
                   onClick={disableLock}
                   className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
                 >
-                  Disable
+                  Deactivate
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => {
-                    setPinSetupOpen(true)
+                    setLockTypeSelectionOpen(true)
                     setUnlockError(null)
                   }}
                   className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15"
                 >
-                  Enable
+                  Choose Lock
                 </button>
               )}
             </div>
 
-            {lockConfig.enabled ? (
+            {/* Lock Type Selection Modal */}
+            {lockTypeSelectionOpen && !lockConfig.enabled ? (
               <div className="mt-4 grid gap-2">
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-900/40 px-3 py-2 ring-1 ring-slate-800">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-100">Fingerprint / FaceID</div>
-                    <div className="text-xs text-slate-400">Unlock the app using your device biometrics (when supported).</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {lockConfig.biometricEnabled && lockConfig.biometricCredentialIdB64 ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const cfg: LockConfig = {
-                            ...lockConfig,
-                            biometricEnabled: false,
-                            biometricCredentialIdB64: null
-                          }
-                          saveLockConfig(cfg)
-                          setLockConfig(cfg)
-                        }}
-                        className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
-                      >
-                        Disable
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={!isBiometricSupported() || busy}
-                        onClick={async () => {
-                          try {
-                            if (!isBiometricSupported()) {
-                              alert('Biometric unlock is not supported on this device/browser.')
-                              return
-                            }
-                            setBusy(true)
-                            const credIdB64 = await registerBiometricCredential('CardGuard', user?.id ?? 'user')
-                            const cfg: LockConfig = {
-                              ...lockConfig,
-                              biometricEnabled: true,
-                              biometricCredentialIdB64: credIdB64
-                            }
-                            saveLockConfig(cfg)
-                            setLockConfig(cfg)
-                            alert('Fingerprint / FaceID enabled')
-                          } catch (e) {
-                            console.error('Biometric setup failed:', e)
-                            alert(e instanceof Error ? e.message : 'Biometric setup failed')
-                          } finally {
-                            setBusy(false)
-                          }
-                        }}
-                        className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/30 hover:bg-emerald-500/15 disabled:opacity-60"
-                      >
-                        Enable
-                      </button>
-                    )}
-                  </div>
+                <div className="text-xs text-slate-300 mb-2">Select lock method:</div>
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLockTypeSelectionOpen(false)
+                      setPinSetupOpen(true)
+                    }}
+                    className="flex items-center gap-3 rounded-xl bg-slate-900/40 px-4 py-3 ring-1 ring-slate-800 hover:bg-slate-900/60 text-left"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800">
+                      <svg className="h-5 w-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-100">6-digit PIN</div>
+                      <div className="text-xs text-slate-400">Use a numeric PIN code to unlock</div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    disabled={!isBiometricSupported()}
+                    onClick={async () => {
+                      try {
+                        if (!isBiometricSupported()) {
+                          alert('Biometric unlock is not supported on this device/browser.')
+                          return
+                        }
+                        setBusy(true)
+                        const credIdB64 = await registerBiometricCredential('CardGuard', user?.id ?? 'user')
+                        const cfg: LockConfig = {
+                          enabled: true,
+                          lockType: 'biometric',
+                          pinSaltB64: null,
+                          pinVerifierB64: null,
+                          biometricEnabled: true,
+                          biometricCredentialIdB64: credIdB64
+                        }
+                        saveLockConfig(cfg)
+                        setLockConfig(cfg)
+                        setLockTypeSelectionOpen(false)
+                        setLocked(true)
+                        alert('Fingerprint / FaceID lock enabled')
+                      } catch (e) {
+                        console.error('Biometric setup failed:', e)
+                        alert(e instanceof Error ? e.message : 'Biometric setup failed')
+                      } finally {
+                        setBusy(false)
+                      }
+                    }}
+                    className="flex items-center gap-3 rounded-xl bg-slate-900/40 px-4 py-3 ring-1 ring-slate-800 hover:bg-slate-900/60 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800">
+                      <svg className="h-5 w-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-100">Fingerprint / FaceID</div>
+                      <div className="text-xs text-slate-400">
+                        {isBiometricSupported() ? 'Use device biometrics to unlock' : 'Not supported on this device'}
+                      </div>
+                    </div>
+                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLockTypeSelectionOpen(false)
+                    setUnlockError(null)
+                  }}
+                  className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
               </div>
             ) : null}
 

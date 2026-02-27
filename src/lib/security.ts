@@ -1,5 +1,6 @@
 export type LockConfig = {
   enabled: boolean
+  lockType: 'pin' | 'biometric' | null
   pinSaltB64: string | null
   pinVerifierB64: string | null
   biometricEnabled?: boolean
@@ -7,6 +8,7 @@ export type LockConfig = {
 }
 
 const LS_ENABLED = 'cardguard.lock.enabled'
+const LS_LOCK_TYPE = 'cardguard.lock.type'
 const LS_SALT = 'cardguard.lock.pinSaltB64'
 const LS_VERIFIER = 'cardguard.lock.pinVerifierB64'
 const LS_BIO_ENABLED = 'cardguard.lock.bio.enabled'
@@ -46,15 +48,19 @@ function utf8Decode(b: Uint8Array): string {
 
 export function loadLockConfig(): LockConfig {
   const enabled = localStorage.getItem(LS_ENABLED) === '1'
+  const lockTypeRaw = localStorage.getItem(LS_LOCK_TYPE)
+  const lockType: LockConfig['lockType'] = lockTypeRaw === 'pin' || lockTypeRaw === 'biometric' ? lockTypeRaw : (enabled ? 'pin' : null)
   const pinSaltB64 = localStorage.getItem(LS_SALT)
   const pinVerifierB64 = localStorage.getItem(LS_VERIFIER)
   const biometricEnabled = localStorage.getItem(LS_BIO_ENABLED) === '1'
   const biometricCredentialIdB64 = localStorage.getItem(LS_BIO_CRED)
-  return { enabled, pinSaltB64, pinVerifierB64, biometricEnabled, biometricCredentialIdB64 }
+  return { enabled, lockType, pinSaltB64, pinVerifierB64, biometricEnabled, biometricCredentialIdB64 }
 }
 
 export function saveLockConfig(cfg: LockConfig) {
   localStorage.setItem(LS_ENABLED, cfg.enabled ? '1' : '0')
+  if (cfg.lockType) localStorage.setItem(LS_LOCK_TYPE, cfg.lockType)
+  else localStorage.removeItem(LS_LOCK_TYPE)
   if (cfg.pinSaltB64) localStorage.setItem(LS_SALT, cfg.pinSaltB64)
   else localStorage.removeItem(LS_SALT)
   if (cfg.pinVerifierB64) localStorage.setItem(LS_VERIFIER, cfg.pinVerifierB64)
@@ -66,6 +72,7 @@ export function saveLockConfig(cfg: LockConfig) {
 
 export function clearLockConfig() {
   localStorage.removeItem(LS_ENABLED)
+  localStorage.removeItem(LS_LOCK_TYPE)
   localStorage.removeItem(LS_SALT)
   localStorage.removeItem(LS_VERIFIER)
   localStorage.removeItem(LS_BIO_ENABLED)
