@@ -2893,11 +2893,12 @@ export default function App() {
       </div>
       
       {/* Footer */}
-      <footer className="bg-slate-950 py-6 ring-1 ring-slate-800">
+      <footer className="border-t border-slate-800 bg-slate-950 py-4">
         <div className="mx-auto max-w-6xl px-4 text-center">
-          <p className="text-xs text-slate-400">
-            Powered by <span className="font-semibold text-slate-300">Retts Web Dev</span> — All rights reserved — Pr registered 2019
+          <p className="text-sm font-medium text-slate-300">
+            Powered by <span className="text-emerald-400">Retts Web Dev</span>
           </p>
+          <p className="mt-1 text-xs text-slate-500">Registered 2019</p>
         </div>
       </footer>
       
