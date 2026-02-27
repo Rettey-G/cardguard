@@ -2891,6 +2891,16 @@ export default function App() {
         ) : null}
         </div>
       </div>
+      
+      {/* Footer */}
+      <footer className="bg-slate-950 py-6 ring-1 ring-slate-800">
+        <div className="mx-auto max-w-6xl px-4 text-center">
+          <p className="text-xs text-slate-400">
+            Powered by <span className="font-semibold text-slate-300">Retts Web Dev</span> — All rights reserved — Pr registered 2019
+          </p>
+        </div>
+      </footer>
+      
       <Analytics />
     </>
   )
