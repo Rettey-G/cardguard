@@ -20,7 +20,7 @@ export type CardRecord = {
   kind: CardKind
   title: string
   issuer?: string
-  expiryDate: string // YYYY-MM-DD
+  expiryDate?: string // YYYY-MM-DD
   renewUrl?: string
   profileId?: string
   renewalProviderId?: string

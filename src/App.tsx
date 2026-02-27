@@ -164,7 +164,7 @@ export default function App() {
 
   async function refresh() {
     const all = await listCards()
-    all.sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))
+    all.sort((a, b) => (a.expiryDate || '9999-12-31').localeCompare(b.expiryDate || '9999-12-31'))
 
     // If lock is enabled, decrypt notes only when unlocked.
     if (lockConfig.enabled) {
@@ -391,9 +391,10 @@ export default function App() {
     const q = searchQuery.trim().toLowerCase()
 
     const by = cards.map((card) => {
-      const days = daysUntil(card.expiryDate)
-      const expired = days < 0
-      const expiringSoon = days >= 0 && days <= reminderDays
+      const hasExpiry = !!card.expiryDate
+      const days = hasExpiry ? daysUntil(card.expiryDate) : Number.POSITIVE_INFINITY
+      const expired = hasExpiry ? days < 0 : false
+      const expiringSoon = hasExpiry ? days >= 0 && days <= reminderDays : false
       const providerName = card.renewalProviderId ? providerById.get(card.renewalProviderId)?.name ?? '' : ''
       const profileName = card.profileId ? profileById.get(card.profileId)?.name ?? '' : 'Personal'
 
@@ -457,9 +458,9 @@ export default function App() {
         const bi = (b.card.issuer ?? '').toLowerCase()
         const cmp = ai.localeCompare(bi)
         if (cmp !== 0) return cmp
-        return a.card.expiryDate.localeCompare(b.card.expiryDate)
+        return (a.card.expiryDate || '9999-12-31').localeCompare(b.card.expiryDate || '9999-12-31')
       }
-      return a.card.expiryDate.localeCompare(b.card.expiryDate)
+      return (a.card.expiryDate || '9999-12-31').localeCompare(b.card.expiryDate || '9999-12-31')
     }
 
     // Group cards by profile
@@ -516,16 +517,18 @@ export default function App() {
   }, [cards, viewingId])
 
   useEffect(() => {
-    if (!settings?.notificationsEnabled) return
+    if (!settings) return
+    if (!('Notification' in window)) return
     if (Notification.permission !== 'granted') return
 
     const reminderDays = settings.reminderDays
     const expiring = cards
       .filter((c) => {
+        if (!c.expiryDate) return false
         const d = daysUntil(c.expiryDate)
         return d >= 0 && d <= reminderDays
       })
-      .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))
+      .sort((a, b) => (a.expiryDate || '9999-12-31').localeCompare(b.expiryDate || '9999-12-31'))
 
     if (expiring.length === 0) return
 
@@ -713,23 +716,39 @@ export default function App() {
   async function shareEcard() {
     try {
       setShareBusy(true)
-      const blob = await renderEcardBlob()
-      const file = new File([blob], 'ecard.png', { type: 'image/png' })
-
       const anyNav: any = navigator
-      const canShareFiles = typeof anyNav.canShare === 'function' && anyNav.canShare({ files: [file] })
 
-      if (anyNav.share && canShareFiles) {
-        await anyNav.share({
-          title: viewingTitle || 'Card',
-          text: 'My e-card',
-          files: [file]
-        })
+      const files: File[] = viewingAttachments.map((a) =>
+        new File([a.blob], a.name || 'attachment', { type: a.contentType || a.blob.type || 'application/octet-stream' })
+      )
+
+      if (files.length > 0) {
+        const canShareFiles = typeof anyNav.canShare === 'function' && anyNav.canShare({ files })
+        if (anyNav.share && canShareFiles) {
+          await anyNav.share({
+            title: viewingTitle || 'Card',
+            files
+          })
+          return
+        }
+
+        // Fallback: download attachments one by one.
+        for (const f of files) {
+          const url = URL.createObjectURL(f)
+          const el = document.createElement('a')
+          el.href = url
+          el.download = f.name
+          document.body.appendChild(el)
+          el.click()
+          el.remove()
+          URL.revokeObjectURL(url)
+        }
+        alert('Sharing is not supported on this browser. The files were downloaded instead.')
         return
       }
 
+      // No attachments: keep old behavior as a fallback
       await downloadEcard()
-      alert('Sharing is not supported on this browser. The card was downloaded instead.')
     } catch (e) {
       const msg = (e as any)?.name === 'AbortError' ? null : (e as Error).message
       if (msg) alert(msg)
@@ -745,7 +764,7 @@ export default function App() {
     setKind(c.kind)
     setTitle(c.title)
     setIssuer(c.issuer ?? '')
-    setExpiryDate(c.expiryDate)
+    setExpiryDate(c.expiryDate ?? '')
     setProfileId(c.profileId ?? '')
     setRenewalProviderId(c.renewalProviderId ?? '')
     setRenewUrl(c.renewUrl ?? '')
@@ -824,7 +843,6 @@ export default function App() {
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!expiryDate) return
     if (!title.trim()) return
 
     if (lockConfig.enabled && !notesKey) {
@@ -845,7 +863,7 @@ export default function App() {
         kind,
         title: title.trim(),
         issuer: issuer.trim() ? issuer.trim() : undefined,
-        expiryDate,
+        expiryDate: expiryDate.trim() ? expiryDate.trim() : undefined,
         profileId: profileId || undefined,
         renewalProviderId: renewalProviderId || undefined,
         renewUrl: normalizeUrl(renewUrl) || undefined,
@@ -1885,7 +1903,7 @@ export default function App() {
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
-                              Expires: {new Date(card.expiryDate).toLocaleDateString()}
+                              {card.expiryDate ? `Expires: ${new Date(card.expiryDate).toLocaleDateString()}` : 'No expiry date'}
                             </div>
                             {card.notes && (
                               <div className="mt-2 text-xs text-slate-300 flex items-start gap-1">
@@ -2003,7 +2021,6 @@ export default function App() {
                       value={expiryDate}
                       onChange={(e) => setExpiryDate(e.target.value)}
                       type="date"
-                      required
                       className="rounded-xl bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </label>
@@ -2431,8 +2448,9 @@ export default function App() {
                 <div className="relative">
                   <button
                     type="button"
+                    disabled={!viewingCard?.expiryDate}
                     onClick={() => setShowCalendarMenu(showCalendarMenu === viewingId ? null : viewingId)}
-                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800"
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-slate-200 ring-1 ring-slate-800 hover:bg-slate-800 disabled:opacity-60"
                   >
                     {t.addToCalendar}
                   </button>
@@ -2442,6 +2460,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
+                          if (!viewingCard.expiryDate) return
                           const url = createGoogleCalendarUrl(
                             `${viewingCard.title} Renewal`,
                             viewingCard.expiryDate,
@@ -2458,6 +2477,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
+                          if (!viewingCard.expiryDate) return
                           const url = createAppleCalendarUrl(
                             `${viewingCard.title} Renewal`,
                             viewingCard.expiryDate,
@@ -2474,6 +2494,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
+                          if (!viewingCard.expiryDate) return
                           downloadICSFile(
                             `${viewingCard.title} Renewal`,
                             viewingCard.expiryDate,
